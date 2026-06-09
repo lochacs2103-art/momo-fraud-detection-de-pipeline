@@ -229,56 +229,53 @@ services:
   # ============================================================
 
   spark-master:
-    # Spark Master: scheduler node
-    # Nhận job submission, phân công tasks cho workers
-    # Không thực sự chạy code — chỉ coordinate
-    image: bitnami/spark:3.5
+    # apache/spark: official image, free, replaces bitnami/spark (now commercial)
+    image: apache/spark:3.5.1
     container_name: spark-master
     hostname: spark-master
+    user: root
     environment:
-      SPARK_MODE: master
-      SPARK_MASTER_HOST: spark-master
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
-      SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED: "no"
-      SPARK_SSL_ENABLED: "no"
+      SPARK_NO_DAEMONIZE: "true"
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080 &&
+        tail -f /opt/spark/logs/*.out
+      "
     ports:
-      - "8081:8080"   # Spark Master Web UI (jobs, workers, stages)
-      - "7077:7077"   # Spark Master RPC — workers và clients connect vào
+      - "8081:8080"   # Spark Master Web UI
+      - "7077:7077"   # Spark Master RPC
     volumes:
-      - ../docker/spark/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf:ro
-      - ../docker/hadoop/core-site.xml:/opt/bitnami/spark/conf/core-site.xml:ro
-      - ../docker/hadoop/hdfs-site.xml:/opt/bitnami/spark/conf/hdfs-site.xml:ro
-      # JDBC driver cho PostgreSQL — Spark cần để connect source-db
-      - ../docker/spark/jars:/opt/bitnami/spark/extra-jars:ro
-      # KHÔNG mount CSV nữa — Spark đọc từ source-db qua JDBC
+      - ../docker/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ../docker/hadoop/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ../docker/hadoop/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
+      - ../docker/spark/jars:/opt/spark/extra-jars:ro
     depends_on:
       hive-metastore:
         condition: service_healthy
       source-db:
-        condition: service_healthy   # source DB phải sẵn sàng trước khi ingest
+        condition: service_healthy
     networks:
       - de_network
 
   spark-worker:
-    # Spark Worker: executor node — thực sự chạy code
-    # Production: nhiều workers trên nhiều máy vật lý
-    # 4 cores + 4GB RAM — đủ cho dev với dataset này
-    image: bitnami/spark:3.5
+    image: apache/spark:3.5.1
     container_name: spark-worker
     hostname: spark-worker
+    user: root
     environment:
-      SPARK_MODE: worker
-      SPARK_MASTER_URL: spark://spark-master:7077
-      SPARK_WORKER_MEMORY: 4G
-      SPARK_WORKER_CORES: 4
-      SPARK_RPC_AUTHENTICATION_ENABLED: "no"
-      SPARK_RPC_ENCRYPTION_ENABLED: "no"
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_MEMORY: 4g
+      SPARK_WORKER_CORES: "4"
+    command: >
+      bash -c "
+        /opt/spark/sbin/start-worker.sh spark://spark-master:7077 &&
+        tail -f /opt/spark/logs/*.out
+      "
     volumes:
-      - ../docker/spark/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf:ro
-      - ../docker/hadoop/core-site.xml:/opt/bitnami/spark/conf/core-site.xml:ro
-      - ../docker/hadoop/hdfs-site.xml:/opt/bitnami/spark/conf/hdfs-site.xml:ro
-      - ../docker/spark/jars:/opt/bitnami/spark/extra-jars:ro
+      - ../docker/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+      - ../docker/hadoop/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ../docker/hadoop/hdfs-site.xml:/opt/spark/conf/hdfs-site.xml:ro
+      - ../docker/spark/jars:/opt/spark/extra-jars:ro
     depends_on:
       - spark-master
     networks:

@@ -102,8 +102,8 @@ ingest:
 	@echo "Running JDBC ingestion jobs (source DB → HDFS raw)..."
 	docker exec spark-master spark-submit \
 		--master spark://spark-master:7077 \
-		--jars /opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar \
-		/opt/bitnami/spark/work-dir/ingestion/jdbc_ingester.py
+		--jars /opt/spark/extra-jars/postgresql-42.7.1.jar \
+		/opt/spark/work-dir/ingestion/jdbc_ingester.py
 
 transform:
 	@echo "Running transformation jobs (raw → staging)..."
