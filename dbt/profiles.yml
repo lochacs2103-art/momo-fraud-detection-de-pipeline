@@ -1,0 +1,20 @@
+momo_fraud:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      method: none
+      host: trino
+      port: 8080
+      database: hive        # Trino catalog name
+      schema: staging       # default schema
+      threads: 4
+
+    prod:
+      type: trino
+      method: none
+      host: trino
+      port: 8080
+      database: hive
+      schema: staging
+      threads: 8

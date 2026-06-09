@@ -1,0 +1,46 @@
+# HDFS paths config
+# Tất cả paths đều define ở đây — không hardcode trong code
+#
+# Storage Policy (set bởi setup_storage_policies.sh):
+#   HOT  → blocks lưu trên [SSD] volume  → raw/, staging/, warehouse/
+#   WARM → blocks lưu trên [DISK] volume → warm/
+#   COLD → blocks lưu trên [DISK] volume → cold/
+
+namenode_uri: hdfs://namenode:9000
+
+# Lake zones
+lake:
+  base:       hdfs://namenode:9000/data/lake
+
+  # HOT tier — [SSD] volume — đọc nhiều, latency thấp
+  raw:        hdfs://namenode:9000/data/lake/raw        # Storage Policy: HOT
+  staging:    hdfs://namenode:9000/data/lake/staging    # Storage Policy: HOT
+  warehouse:  hdfs://namenode:9000/data/lake/warehouse  # Storage Policy: HOT
+  quarantine: hdfs://namenode:9000/data/lake/quarantine # Storage Policy: HOT
+
+  # WARM tier — [DISK] volume — 8–90 ngày, ít query hơn
+  warm:       hdfs://namenode:9000/data/lake/warm       # Storage Policy: WARM
+
+  # COLD tier — [DISK] volume — 91+ ngày, aggregated only
+  cold:       hdfs://namenode:9000/data/lake/cold       # Storage Policy: COLD
+
+# Tables — từng table có path riêng trong từng layer
+tables:
+  transactions:
+    raw:       hdfs://namenode:9000/data/lake/raw/transactions
+    staging:   hdfs://namenode:9000/data/lake/staging/transactions
+    warehouse: hdfs://namenode:9000/data/lake/warehouse/fact_transactions
+    quarantine: hdfs://namenode:9000/data/lake/quarantine/transactions
+  users:
+    raw:       hdfs://namenode:9000/data/lake/raw/users
+    staging:   hdfs://namenode:9000/data/lake/staging/users
+    warehouse: hdfs://namenode:9000/data/lake/warehouse/dim_users
+  cards:
+    raw:       hdfs://namenode:9000/data/lake/raw/cards
+    staging:   hdfs://namenode:9000/data/lake/staging/cards
+    warehouse: hdfs://namenode:9000/data/lake/warehouse/dim_cards
+  mcc_codes:
+    raw:       hdfs://namenode:9000/data/lake/raw/mcc_codes
+    staging:   hdfs://namenode:9000/data/lake/staging/mcc_codes
+  transaction_event_log:
+    warehouse: hdfs://namenode:9000/data/lake/warehouse/transaction_event_log

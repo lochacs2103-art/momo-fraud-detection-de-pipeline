@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Spark local files
+derby.log
+metastore_db/
+spark-warehouse/
+
+# JDBC drivers (download bằng make download-jars)
+docker/spark/jars/
+
+# Logs
+*.log
+logs/
+
+# Data files — KHÔNG commit raw data lên GitHub
+# Người dùng tự download hoặc generate
+data/raw/*.csv
+data/raw/*.json
+
+# Docker volumes (local data, không commit)
+docker/volumes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dbt artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/.user.yml
+
+# Airflow local
+airflow/logs/
+airflow/__pycache__/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# mypy
+.mypy_cache/
+
+# Hydra outputs
+outputs/
+multirun/

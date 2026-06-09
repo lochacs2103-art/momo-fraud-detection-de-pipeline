@@ -1,0 +1,20 @@
+name: momo_fraud
+version: '1.0.0'
+config-version: 2
+
+profile: momo_fraud
+
+model-paths: ["models"]
+test-paths:  ["tests"]
+
+models:
+  momo_fraud:
+    staging:
+      +materialized: view          # staging = views, chạy nhanh
+      +schema: staging
+    warehouse:
+      +materialized: incremental   # warehouse = incremental tables
+      +schema: warehouse
+    marts:
+      +materialized: table         # marts = full tables, rebuild daily
+      +schema: warehouse

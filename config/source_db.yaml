@@ -1,0 +1,52 @@
+# Source Database config — PostgreSQL operational DB
+# Spark đọc từ đây qua JDBC thay vì đọc CSV trực tiếp
+
+host: source-db
+port: 5432
+database: momo_source
+user: momo
+password: momo
+
+# JDBC URL format cho Spark
+jdbc_url: "jdbc:postgresql://source-db:5432/momo_source"
+
+# PostgreSQL JDBC driver class
+driver: "org.postgresql.Driver"
+
+# JDBC jar path trong Spark container
+jdbc_jar: "/opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar"
+
+# Tables cần ingest — tên table trong source DB
+tables:
+  transactions: raw_transactions
+  users:        raw_users
+  cards:        raw_cards
+  mcc_codes:    raw_mcc_codes
+  fraud_labels: raw_fraud_labels
+
+# Parallel read config — quan trọng cho performance
+# Spark chia query thành N partitions dựa trên partition_column
+# Mỗi partition = 1 JDBC connection = 1 Spark task chạy song song
+parallel_read:
+  transactions:
+    # Dùng ctid (PostgreSQL internal row ID) để chia partitions đều
+    # Vì transaction_id là TEXT, không phải numeric
+    # ctid range: (0,1) đến (max_block, max_offset)
+    partition_column: "id"           # sẽ được cast sang numeric trong query
+    num_partitions: 8                # 8 connections song song
+    # lower_bound và upper_bound được detect tự động trong code
+  users:
+    partition_column: "id"
+    num_partitions: 4
+  cards:
+    partition_column: "id"
+    num_partitions: 4
+  mcc_codes:
+    num_partitions: 1                # nhỏ, 1 partition là đủ
+  fraud_labels:
+    partition_column: "transaction_id"
+    num_partitions: 4
+
+# Fetch size: số rows PostgreSQL gửi cho Spark mỗi lần fetch
+# Default 10 — quá nhỏ, tăng lên để giảm round trips
+fetch_size: 10000

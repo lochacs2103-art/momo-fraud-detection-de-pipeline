@@ -1,0 +1,75 @@
+# Spark configuration
+# Được load bởi SparkSessionFactory trong ingestion/transformation jobs
+
+app_name: momo_fraud_pipeline
+master: spark://spark-master:7077
+# master: local[*]   # uncomment để chạy local
+
+configs:
+  # ── Hive Metastore ──────────────────────────────────────────
+  spark.sql.catalogImplementation: hive
+  spark.hive.metastore.uris: thrift://hive-metastore:9083
+
+  # ── Executor Sizing ──────────────────────────────────────────
+  # Tổng OS memory per executor = executor.memory + memoryOverhead
+  spark.executor.memory:          "4g"     # JVM heap
+  spark.executor.memoryOverhead:  "1g"     # off-heap: Python worker, JVM native, network buffers
+  spark.driver.memory:            "2g"
+  spark.driver.memoryOverhead:    "512m"
+  spark.executor.cores:           "5"      # sweet spot: HDFS 3 connections/executor
+
+  # ── Memory Fraction (Unified Memory Manager) ─────────────────
+  # Executor JVM heap layout:
+  #   Reserved      = 300MB hardcoded
+  #   Usable        = heap - 300MB ≈ 3.7GB
+  #   Unified Pool  = usable × memory.fraction   → Storage + Execution (có thể mượn nhau)
+  #   User Memory   = usable × (1 - fraction)    → Python UDFs, user data
+  spark.memory.fraction:          "0.6"    # 60% usable vào Unified Pool
+  spark.memory.storageFraction:   "0.3"    # 30% Unified → Storage, 70% → Execution
+  # Job này ít cache (chỉ mcc nhỏ) → storageFraction thấp → Execution nhiều room hơn
+
+  # Off-heap Spark (giảm GC pressure)
+  spark.memory.offHeap.enabled:   "true"
+  spark.memory.offHeap.size:      "1g"
+
+  # ── AQE (Adaptive Query Execution) ───────────────────────────
+  spark.sql.adaptive.enabled:                       "true"
+  spark.sql.adaptive.coalescePartitions.enabled:    "true"
+  spark.sql.adaptive.skewJoin.enabled:              "true"
+  spark.sql.adaptive.advisoryPartitionSizeInBytes:  "134217728"  # 128MB
+
+  # ── Broadcast Join ───────────────────────────────────────────
+  spark.sql.autoBroadcastJoinThreshold: "52428800"  # 50MB
+
+  # ── Dynamic Partition Overwrite ──────────────────────────────
+  # Chỉ overwrite đúng partition có data mới — không đụng partitions khác
+  spark.sql.sources.partitionOverwriteMode: dynamic
+
+  # ── Dynamic Allocation ───────────────────────────────────────
+  spark.dynamicAllocation.enabled:          "true"
+  spark.dynamicAllocation.minExecutors:     "2"
+  spark.dynamicAllocation.maxExecutors:     "20"
+  spark.dynamicAllocation.initialExecutors: "5"
+
+  # ── Speculation ──────────────────────────────────────────────
+  spark.speculation:            "true"
+  spark.speculation.multiplier: "1.5"   # task chậm hơn 1.5x median → re-launch
+
+  # ── Serializer ───────────────────────────────────────────────
+  spark.serializer:    org.apache.spark.serializer.KryoSerializer
+  spark.kryo.unsafe:   "true"
+
+  # ── Parquet ──────────────────────────────────────────────────
+  spark.sql.parquet.filterPushdown:         "true"
+  spark.sql.parquet.enableVectorizedReader: "true"
+  spark.sql.parquet.mergeSchema:            "false"
+  spark.sql.parquet.compression.codec:      snappy
+  spark.sql.parquet.blockSize:              "134217728"  # 128MB row group
+  spark.sql.parquet.pageSize:               "1048576"    # 1MB page
+  spark.sql.parquet.dictionaryEncodingEnabled: "true"    # tốt cho card_brand, mcc
+
+  # ── Shuffle ──────────────────────────────────────────────────
+  spark.sql.shuffle.partitions: "200"   # AQE sẽ tự coalesce xuống nếu data nhỏ
+
+# Target file size khi write (bytes) — dùng trong compaction
+target_file_size_bytes: 134217728   # 128MB

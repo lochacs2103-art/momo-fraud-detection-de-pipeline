@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: "Staging transactions — cleaned, valid records only"
+    columns:
+      - name: transaction_id
+        description: "Unique transaction identifier"
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        tests:
+          - not_null
+      - name: amount
+        description: "Parsed amount value. NULL if format was AMBIGUOUS or INVALID"
+      - name: amount_format
+        description: "US | EU | CLEAN | VN | AMBIGUOUS | INVALID"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['US', 'EU', 'CLEAN', 'VN', 'AMBIGUOUS', 'INVALID']
+      - name: is_fraud
+        description: "True/False/NULL — NULL means label not yet available (late arriving)"
+      - name: is_valid
+        tests:
+          - not_null
+
+  - name: stg_users
+    description: "Staging users"
+    columns:
+      - name: user_id
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_cards
+    description: "Staging cards — CVV dropped, card_number masked"
+    columns:
+      - name: card_id
+        tests:
+          - not_null
+          - unique

@@ -1,0 +1,23 @@
+# Pipeline config — entry point cho toàn bộ project
+# Hydra sẽ merge file này với các sub-configs bên dưới
+
+defaults:
+  - spark: default
+  - hdfs: default
+  - hive: default
+  - _self_
+
+project:
+  name: momo_fraud_detection
+  env: dev   # dev | staging | prod
+
+# Data paths trên host machine (tương đối với project root)
+data:
+  raw_input: data/raw
+  
+# Ingestion settings
+ingestion:
+  batch_id_prefix: "batch"
+  # Với dataset static (CSV files), chạy 1 lần là đủ
+  # Production: đây sẽ là date range của batch
+  mode: full_load   # full_load | incremental

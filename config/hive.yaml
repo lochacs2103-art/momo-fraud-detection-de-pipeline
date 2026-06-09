@@ -1,0 +1,17 @@
+# Hive databases và table config
+# Tương ứng với 3 layers
+
+metastore_uri: thrift://hive-metastore:9083
+
+databases:
+  raw: raw               # Layer 1 — external tables trỏ vào HDFS raw/
+  staging: staging       # Layer 2 — external tables trỏ vào HDFS staging/
+  warehouse: warehouse   # Layer 3 — external tables trỏ vào HDFS warehouse/
+
+# Compression mặc định cho từng layer
+compression:
+  raw: SNAPPY
+  staging: SNAPPY
+  warehouse: SNAPPY
+  warm: ZSTD       # tiered storage dùng ZSTD — compress tốt hơn, phù hợp cho cold data
+  cold: ZSTD
