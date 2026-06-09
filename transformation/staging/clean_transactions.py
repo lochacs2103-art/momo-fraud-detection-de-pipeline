@@ -1,7 +1,11 @@
 """
-clean_transactions.py — Raw → Staging transformation cho transactions.
+clean_transactions.py — Raw → Staging: CHỈ làm sạch, KHÔNG enrich.
 
-Cleaning steps (theo quyết định trong myReadme.md):
+Nguyên tắc tách biệt trách nhiệm:
+  clean_transactions.py  → làm sạch data (cast, mask, parse, flag)
+  enrich_transactions.py → enrich data (join mcc, cards, fraud_labels)
+
+Cleaning steps:
 1.  Cast types (date → TIMESTAMP, mcc → INT)
 2.  PCI Masking (card_number masked, cvv dropped)
 3.  Amount parsing (AmountParser — 5 cols) + is_refund flag
@@ -9,10 +13,12 @@ Cleaning steps (theo quyết định trong myReadme.md):
 5.  zip cleaning (float → 5-digit string)
 6.  use_chip encoding (string → INT enum 0/1/2)
 7.  errors explode (1 string → 7 boolean columns + has_error)
-8.  mcc_description enrich (UNKNOWN nếu không khớp, NULL nếu mcc null)
-9.  Deduplication (giữ _loaded_at mới nhất per transaction_id)
-10. is_valid flag
-11. Route quarantine records
+8.  Deduplication (giữ _loaded_at mới nhất per transaction_id)
+9.  is_valid flag (chưa có card_brand/is_fraud — sẽ có sau enrich)
+10. Route quarantine records (amount AMBIGUOUS/INVALID)
+
+Sau bước này: card_brand, card_type, card_number_masked, mcc_description,
+is_fraud sẽ là NULL — enrich_transactions.py sẽ populate các fields đó.
 """
 
 from pathlib import Path
@@ -167,25 +173,6 @@ def _explode_errors(df: DataFrame) -> DataFrame:
     return df
 
 
-def _enrich_mcc(df: DataFrame, mcc_df: DataFrame) -> DataFrame:
-    """
-    Step 8: Join với mcc_codes.
-    - Khớp → mcc_description từ lookup
-    - Không khớp (mcc tồn tại nhưng không có trong table) → 'UNKNOWN'
-    - mcc là NULL → mcc_description = NULL
-    """
-    from pyspark.sql.functions import broadcast
-
-    df = df.join(broadcast(mcc_df), on="mcc", how="left")
-    df = df.withColumn(
-        "mcc_description",
-        F.when(F.col("mcc").isNull(), F.lit(None).cast("string"))
-         .when(F.col("mcc_description").isNull(), F.lit("UNKNOWN"))
-         .otherwise(F.col("mcc_description"))
-    )
-    return df
-
-
 def _flag_refund(df: DataFrame) -> DataFrame:
     """Step 3 (sau amount parse): amount < 0 → is_refund = TRUE."""
     return df.withColumn(
@@ -222,32 +209,25 @@ def clean_transactions(
     cfg = _load_config()
     year, month, day = execution_date.year, execution_date.month, execution_date.day
 
-    raw_path      = f"{cfg['tables']['transactions']['raw']}/year={year}/month={month}/day={day}"
-    staging_path  = cfg["tables"]["transactions"]["staging"]
+    raw_path        = f"{cfg['tables']['transactions']['raw']}/year={year}/month={month}/day={day}"
+    staging_path    = cfg["tables"]["transactions"]["staging"]
     quarantine_path = cfg["tables"]["transactions"]["quarantine"]
-    mcc_raw_path  = cfg["tables"]["mcc_codes"]["raw"]
 
     logger.info("clean_transactions.start", date=execution_date.isoformat())
 
-    # ── Đọc data ────────────────────────────────────────────────────────
+    # ── Đọc raw partition của ngày này ──────────────────────────────────
     df = spark.read.parquet(raw_path)
     raw_count = df.count()
 
-    # mcc_codes để enrich
-    mcc_df = spark.read.parquet(mcc_raw_path) \
-        .select("mcc", "mcc_description") \
-        .dropDuplicates(["mcc"])
-
-    # ── Apply cleaning steps ─────────────────────────────────────────────
+    # ── Apply cleaning steps (KHÔNG enrich — enrich_transactions.py làm sau) ─
     df = _cast_types(df)
     df = _pci_mask(df)
-    df = apply_amount_parser(df, raw_col="amount")   # amount → 5 cols
+    df = apply_amount_parser(df, raw_col="amount")
     df = _flag_refund(df)
     df = _flag_online_transactions(df)
     df = _clean_zip(df)
     df = _encode_use_chip(df)
     df = _explode_errors(df)
-    df = _enrich_mcc(df, mcc_df)
 
     # ── Dedup: giữ _loaded_at mới nhất per transaction_id ────────────────
     w = Window.partitionBy("transaction_id").orderBy(F.col("_loaded_at").desc())
