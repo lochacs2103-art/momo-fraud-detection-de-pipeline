@@ -10,8 +10,8 @@ Tại sao define schema explicit?
 
 from pyspark.sql.types import (
     StructType, StructField,
-    StringType, DoubleType, IntegerType,
-    TimestampType, BooleanType, LongType
+    StringType, IntegerType,
+    TimestampType, BooleanType, DecimalType
 )
 
 # Schema khi đọc từ CSV — tất cả đều là StringType
@@ -41,11 +41,13 @@ STAGING_SCHEMA = StructType([
     StructField("card_id",            StringType(),   nullable=True),
 
     # Amount — 5 cột từ AmountParser
-    StructField("amount_raw",         StringType(),   nullable=True),
-    StructField("amount",             DoubleType(),   nullable=True),
-    StructField("amount_currency",    StringType(),   nullable=True),
-    StructField("amount_format",      StringType(),   nullable=True),
-    StructField("amount_parse_note",  StringType(),   nullable=True),
+    # DECIMAL(18,2) thay vì DOUBLE — tránh floating-point precision error
+    # Fintech yêu cầu: 10.10 là 10.10, không phải 10.09999999...
+    StructField("amount_raw",         StringType(),      nullable=True),
+    StructField("amount",             DecimalType(18,2), nullable=True),
+    StructField("amount_currency",    StringType(),      nullable=True),
+    StructField("amount_format",      StringType(),      nullable=True),
+    StructField("amount_parse_note",  StringType(),      nullable=True),
 
     # Amount flag
     StructField("is_refund",          BooleanType(),  nullable=True),

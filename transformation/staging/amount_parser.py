@@ -181,10 +181,10 @@ def apply_amount_parser(df: DataFrame, raw_col: str = "amount") -> DataFrame:
     from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
     result_schema = StructType([
-        StructField("amount",             DoubleType(),  True),
-        StructField("amount_currency",    StringType(),  True),
-        StructField("amount_format",      StringType(),  False),
-        StructField("amount_parse_note",  StringType(),  True),
+        StructField("amount",             DecimalType(18,2), True),
+        StructField("amount_currency",    StringType(),      True),
+        StructField("amount_format",      StringType(),      False),
+        StructField("amount_parse_note",  StringType(),      True),
     ])
 
     @pandas_udf(result_schema)
