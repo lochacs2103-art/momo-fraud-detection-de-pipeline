@@ -1,69 +1,30 @@
--- dim_users.sql — SCD Type 2
--- Mỗi khi user thay đổi info → row mới với valid_from mới
--- Row cũ: valid_to = now(), is_current = false
--- Row mới: valid_to = '9999-12-31', is_current = true
+-- dim_users.sql
+--
+-- ⚠ SCD Type 2 NOTE:
+-- dbt incremental với unique_key='user_id' thực hiện MERGE/UPSERT —
+-- tức là UPDATE row cũ khi user_id đã tồn tại → đây là SCD Type 1 behavior.
+--
+-- SCD Type 2 thật sự (expire old rows, insert new rows với valid_from/valid_to)
+-- được implement trong: transformation/warehouse/build_dim_users.py (Spark job)
+-- Spark job đó chạy TRƯỚC dbt trong Airflow DAG.
+--
+-- Model này chỉ là VIEW/incremental để Trino + Superset query được dim_users
+-- sau khi Spark job đã build đúng SCD2 structure trên HDFS.
+-- → Không duplicate logic, không conflict.
 
-{{ config(materialized='incremental', unique_key='user_id') }}
+{{ config(
+    materialized='incremental',
+    unique_key='user_id',
+    incremental_strategy='merge',
+    on_schema_change='sync_all_columns'
+) }}
 
-WITH current_snapshot AS (
-    SELECT
-        user_id,
-        current_age,
-        retirement_age,
-        gender,
-        address,
-        latitude,
-        longitude,
-        per_capita_income,
-        yearly_income,
-        total_debt,
-        credit_score,
-        num_credit_cards,
-        _batch_id
-    FROM {{ ref('stg_users') }}
-),
-
-{% if is_incremental() %}
--- So sánh với existing dim để detect changes
-existing AS (
-    SELECT * FROM {{ this }}
-    WHERE is_current = true
-),
-
-changed AS (
-    SELECT
-        n.user_id,
-        n.current_age,
-        n.retirement_age,
-        n.gender,
-        n.address,
-        n.latitude,
-        n.longitude,
-        n.per_capita_income,
-        n.yearly_income,
-        n.total_debt,
-        n.credit_score,
-        n.num_credit_cards,
-        n._batch_id,
-        -- Detect nếu có gì thay đổi
-        (
-            COALESCE(e.address, '')          != COALESCE(n.address, '')          OR
-            COALESCE(e.yearly_income, 0)     != COALESCE(n.yearly_income, 0)     OR
-            COALESCE(e.credit_score, 0)      != COALESCE(n.credit_score, 0)      OR
-            COALESCE(e.total_debt, 0)        != COALESCE(n.total_debt, 0)
-        ) AS is_changed
-    FROM current_snapshot n
-    LEFT JOIN existing e USING (user_id)
-)
-{% else %}
-changed AS (
-    SELECT *, true AS is_changed FROM current_snapshot
-)
-{% endif %}
-
+-- Đọc từ HDFS path mà build_dim_users.py (Spark SCD2) đã write
+-- Chỉ expose current rows để downstream (fact joins, Superset) dùng
 SELECT
     user_id,
     current_age,
+    age_group,
     retirement_age,
     gender,
     address,
@@ -73,10 +34,17 @@ SELECT
     yearly_income,
     total_debt,
     credit_score,
+    credit_score_band,
+    is_invalid_credit_score,
     num_credit_cards,
-    CURRENT_TIMESTAMP          AS valid_from,
-    TIMESTAMP '9999-12-31 00:00:00' AS valid_to,
-    true                       AS is_current,
+    valid_from,
+    valid_to,
+    is_current,
     _batch_id
-FROM changed
-WHERE is_changed = true
+
+FROM hive.warehouse.dim_users
+
+{% if is_incremental() %}
+-- Chỉ sync rows được Spark job update trong batch gần nhất
+WHERE _batch_id = (SELECT MAX(_batch_id) FROM hive.warehouse.dim_users)
+{% endif %}
