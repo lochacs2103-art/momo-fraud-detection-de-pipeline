@@ -267,7 +267,9 @@ def clean_transactions(
         .parquet(staging_path)
 
     if df_quarantine.count() > 0:
-        df_quarantine.write.mode("append") \
+        # Dùng overwrite dynamic partition — idempotent như valid data
+        # Chạy lại cùng ngày → overwrite đúng partition đó, không duplicate
+        df_quarantine.write.mode("overwrite") \
             .option("compression", "snappy") \
             .partitionBy("year", "month", "day") \
             .parquet(quarantine_path)
