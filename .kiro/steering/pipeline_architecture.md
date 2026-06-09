@@ -121,7 +121,9 @@ raw_fraud_labels  (transaction_id, is_fraud TEXT, _loaded_at, _source_file)
 
 **Công cụ:** Apache Spark, đọc từ source DB qua JDBC
 **Format:** Parquet + Snappy compression
-**Mode:** Append-only — không bao giờ overwrite hay delete raw data
+**Write mode:** Idempotent overwrite per partition (dynamic partition overwrite)
+
+> **Lưu ý về "append-only":** RAW layer không bao giờ xóa partitions cũ hay modify data của ngày khác. Nhưng nếu chạy lại job cho cùng 1 ngày, partition đó sẽ bị overwrite với data mới nhất — đây là **idempotent**, không phải strict append-only. Với `spark.sql.sources.partitionOverwriteMode = dynamic`, Spark chỉ overwrite đúng partition đang write, không đụng các partitions khác.
 
 ### JDBC Parallel Read
 

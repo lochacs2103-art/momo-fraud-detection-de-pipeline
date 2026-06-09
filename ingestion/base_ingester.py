@@ -151,11 +151,14 @@ class BaseIngester(ABC):
         """
         Write DataFrame to HDFS as Parquet.
 
-        Mode: overwrite với dynamic partition overwrite.
-        Tức là: chỉ overwrite đúng partitions có trong df này.
-        Các partitions khác không bị đụng.
+        Mode: idempotent overwrite per partition (dynamic partition overwrite).
+        - spark.sql.sources.partitionOverwriteMode = dynamic
+        - Chỉ overwrite đúng partition đang write, không đụng partitions khác.
+        - Chạy lại cùng job cho cùng ngày → overwrite partition đó với data mới nhất.
+        - Partitions của ngày khác không bị ảnh hưởng.
 
-        Idempotent: chạy lại với cùng data → kết quả như nhau.
+        Đây là idempotent, không phải strict append-only.
+        Strict append-only sẽ tạo duplicate khi chạy lại → cần dedup downstream.
         """
         partition_cols = self.get_partition_cols()
 
