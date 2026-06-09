@@ -8,14 +8,15 @@ from pyspark.sql.types import (
 RAW_CSV_SCHEMA = StructType([
     StructField("id",               StringType(), nullable=True),
     StructField("client_id",        StringType(), nullable=True),
-    StructField("card_brand",       StringType(), nullable=True),   # Visa, Mastercard, ...
-    StructField("card_type",        StringType(), nullable=True),   # Credit, Debit, ...
-    StructField("card_number",      StringType(), nullable=True),   # PAN — sensitive!
+    StructField("card_brand",       StringType(), nullable=True),
+    StructField("card_type",        StringType(), nullable=True),
+    StructField("card_number",      StringType(), nullable=True),   # PAN — sẽ mask ở staging
     StructField("expires",          StringType(), nullable=True),   # "MM/YYYY"
-    StructField("cvv",              StringType(), nullable=True),   # sensitive!
+    # cvv: KHÔNG DEFINE trong schema — sẽ bị drop ngay tại CardJDBCIngester.read_source()
+    # PCI DSS: CVV không bao giờ được persist vào storage
     StructField("has_chip",         StringType(), nullable=True),   # "YES"/"NO"
     StructField("num_cards_issued", StringType(), nullable=True),
-    StructField("credit_limit",     StringType(), nullable=True),   # có thể có "$" prefix
+    StructField("credit_limit",     StringType(), nullable=True),
     StructField("acct_open_date",   StringType(), nullable=True),
     StructField("year_pin_last_changed", StringType(), nullable=True),
     StructField("card_on_dark_web", StringType(), nullable=True),   # "Yes"/"No"

@@ -29,7 +29,11 @@ def _load_config():
 
 
 def _pci_mask_cards(df: DataFrame) -> DataFrame:
-    """Mask card_number, drop cvv."""
+    """
+    PCI DSS compliance cho cards.
+    card_number: mask → XXXX-XXXX-XXXX-{last4}
+    CVV đã bị drop tại CardJDBCIngester.read_source() — không cần drop lại.
+    """
     import re as _re
     mask_udf = F.udf(
         lambda cn: f"XXXX-XXXX-XXXX-{_re.sub(r'[^0-9]', '', str(cn or ''))[-4:].zfill(4)}"
@@ -38,8 +42,6 @@ def _pci_mask_cards(df: DataFrame) -> DataFrame:
     if "card_number" in df.columns:
         df = df.withColumn("card_number_masked", mask_udf(F.col("card_number"))) \
                .drop("card_number")
-    if "cvv" in df.columns:
-        df = df.drop("cvv")
     return df
 
 

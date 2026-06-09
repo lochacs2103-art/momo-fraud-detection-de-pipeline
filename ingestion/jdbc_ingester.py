@@ -213,7 +213,15 @@ class UserJDBCIngester(JDBCIngester):
 
 
 class CardJDBCIngester(JDBCIngester):
-    """Ingest raw_cards từ PostgreSQL → HDFS raw layer."""
+    """
+    Ingest raw_cards từ PostgreSQL → HDFS raw layer.
+
+    PCI DSS compliance:
+    - CVV: DROP ngay tại ingestion, TRƯỚC KHI write vào HDFS.
+      CVV không bao giờ được persist vào bất kỳ storage nào.
+    - card_number: giữ ở raw layer (vẫn là full PAN),
+      sẽ được mask thành XXXX-XXXX-XXXX-1234 ở staging layer.
+    """
 
     def get_source_table(self) -> str:
         return self.db_config["tables"]["cards"]
@@ -228,11 +236,21 @@ class CardJDBCIngester(JDBCIngester):
     def get_partition_cols(self) -> list:
         return ["card_brand_part", "expires_year_part"]
 
+    def read_source(self) -> DataFrame:
+        """
+        Override read_source để drop CVV ngay sau khi đọc từ DB.
+        CVV không bao giờ được write xuống HDFS — kể cả raw layer.
+        PCI DSS: CVV chỉ tồn tại trong memory, không persist.
+        """
+        df = super().read_source()
+        if "cvv" in df.columns:
+            df = df.drop("cvv")
+            logger.info("card_ingester.cvv_dropped",
+                        note="CVV dropped before HDFS write — PCI DSS compliance")
+        return df
+
     def add_partition_cols(self, df: DataFrame) -> DataFrame:
-        """
-        Partition theo card_brand và expires_year.
-        expires có format "MM/YYYY" → extract year.
-        """
+        """Partition theo card_brand và expires_year."""
         return df \
             .withColumn("card_brand_part",
                         F.lower(F.col("card_brand"))) \
