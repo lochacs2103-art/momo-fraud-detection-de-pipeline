@@ -43,7 +43,7 @@ def enrich_transactions(spark: SparkSession, execution_date: date) -> dict:
         f"/year={year}/month={month}/day={day}"
     )
     staging_path  = cfg["tables"]["transactions"]["staging"]
-    mcc_path      = cfg["tables"]["mcc_codes"]["raw"]
+    mcc_path      = cfg["tables"]["mcc_codes"]["staging"]   # staging có mcc INT + mcc_description
     cards_path    = cfg["tables"]["cards"]["raw"]
     fraud_path    = cfg["lake"]["raw"] + "/fraud_labels"
 
