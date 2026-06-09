@@ -2,7 +2,7 @@
 # Chạy: make <target>
 # Ví dụ: make up, make ingest, make transform
 
-.PHONY: help up down ps logs ingest transform test clean
+.PHONY: help up down ps logs ingest transform transform-warehouse compact dbt-run dbt-test pipeline test clean
 
 # Default target
 help:
@@ -22,9 +22,13 @@ help:
 	@echo "  make hdfs-policies  — Xem storage policies hiện tại"
 	@echo ""
 	@echo "Pipeline:"
-	@echo "  make ingest    — Chạy ingestion (source DB → HDFS raw)"
-	@echo "  make transform — Chạy transformation (staging layer)"
-	@echo "  make compact   — Chạy compaction job"
+	@echo "  make ingest             — Ingest: source DB → HDFS raw (JDBC parallel)"
+	@echo "  make transform          — Transform: raw → staging (clean + enrich)"
+	@echo "  make transform-warehouse — Build warehouse: dims (SCD1/2) + fraud features"
+	@echo "  make compact            — Compaction: merge small files, sort by user_id"
+	@echo "  make dbt-run            — Run dbt models (staging → warehouse → marts)"
+	@echo "  make dbt-test           — Run dbt tests"
+	@echo "  make pipeline           — Run full pipeline end-to-end"
 	@echo ""
 	@echo "Development:"
 	@echo "  make test      — Chạy unit tests"
@@ -102,12 +106,71 @@ ingest:
 		/opt/bitnami/spark/work-dir/ingestion/jdbc_ingester.py
 
 transform:
-	@echo "Running transformation jobs..."
-	# TODO: implement
+	@echo "Running transformation jobs (raw → staging)..."
+	@echo "Step 1: Clean transactions..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		--jars /opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar \
+		/opt/bitnami/spark/work-dir/transformation/staging/clean_transactions.py
+	@echo "Step 2: Clean users..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/staging/clean_users.py
+	@echo "Step 3: Clean cards..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/staging/clean_cards.py
+	@echo "Step 4: Enrich transactions (broadcast join mcc/cards/fraud)..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/staging/enrich_transactions.py
+	@echo "Transformation complete."
+
+transform-warehouse:
+	@echo "Running warehouse build jobs..."
+	@echo "Step 1: Build dim_users (SCD Type 2)..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/warehouse/build_dim_users.py
+	@echo "Step 2: Build dim_cards (SCD Type 1)..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/warehouse/build_dim_cards.py
+	@echo "Step 3: Build fraud features (window functions)..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/warehouse/build_fraud_features.py
+	@echo "Warehouse build complete."
 
 compact:
-	@echo "Running compaction jobs..."
-	# TODO: implement
+	@echo "Running compaction job (merge small files, sort by user_id)..."
+	docker exec spark-master spark-submit \
+		--master spark://spark-master:7077 \
+		/opt/bitnami/spark/work-dir/transformation/compaction/compactor.py
+	@echo "Compaction complete."
+
+dbt-run:
+	@echo "Running dbt models (staging → warehouse → marts)..."
+	docker exec trino dbt run \
+		--profiles-dir /opt/dbt \
+		--project-dir /opt/dbt \
+		--target prod
+
+dbt-test:
+	@echo "Running dbt tests..."
+	docker exec trino dbt test \
+		--profiles-dir /opt/dbt \
+		--project-dir /opt/dbt \
+		--target prod
+
+pipeline:
+	@echo "Running full pipeline: ingest → transform → warehouse → dbt..."
+	make ingest
+	make transform
+	make transform-warehouse
+	make dbt-run
+	make dbt-test
+	@echo "Full pipeline complete."
 
 # ---- Development ----
 
