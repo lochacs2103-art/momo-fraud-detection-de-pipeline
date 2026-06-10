@@ -145,16 +145,15 @@ services:
   # ============================================================
 
   hive-metastore-db:
-    # PostgreSQL làm backend cho Hive Metastore
-    # Lưu: table names, column types, partition info, HDFS locations
-    # Derby (default của Hive) không support concurrent access → dùng PostgreSQL
-    image: postgres:14-alpine
+    image: postgres:13-alpine
     container_name: hive-metastore-db
     hostname: hive-metastore-db
     environment:
       POSTGRES_DB: metastore
       POSTGRES_USER: hive
       POSTGRES_PASSWORD: hive
+      # Force md5 auth — Hive's JDBC driver does not support scram-sha-256 (pg14+ default)
+      POSTGRES_HOST_AUTH_METHOD: md5
     volumes:
       - hive_metastore_db:/var/lib/postgresql/data
     healthcheck:
