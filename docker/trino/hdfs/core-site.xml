@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <!-- HDFS entry point — tất cả services dùng URI này để connect vào HDFS -->
+  <!-- "namenode" là tên Docker service, tự resolve trong de_network -->
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://namenode:9000</value>
+  </property>
+
+  <!-- Cho phép user "root" (trong container) impersonate bất kỳ user nào -->
+  <!-- Cần thiết để Hive, Spark, Airflow write vào HDFS dưới cùng user -->
+  <property>
+    <name>hadoop.proxyuser.root.hosts</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.root.groups</name>
+    <value>*</value>
+  </property>
+
+  <!-- Tương tự cho user "hive" -->
+  <property>
+    <name>hadoop.proxyuser.hive.hosts</name>
+    <value>*</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.hive.groups</name>
+    <value>*</value>
+  </property>
+</configuration>

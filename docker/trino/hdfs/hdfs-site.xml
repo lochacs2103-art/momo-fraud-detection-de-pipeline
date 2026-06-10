@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+  <!-- Replication factor = 1 vì chỉ có 1 datanode trong dev environment -->
+  <!-- Production: thường là 3 (mỗi block được copy sang 3 nodes khác nhau) -->
+  <!-- Nếu để 3 với 1 datanode → HDFS sẽ warn liên tục vì không đủ nodes để replicate -->
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+  </property>
+
+  <!-- Nơi namenode lưu metadata (fsimage, edits log) trong container -->
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>file:///hadoop/dfs/name</value>
+  </property>
+
+  <!-- Nơi datanode lưu actual data blocks -->
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>file:///hadoop/dfs/data</value>
+  </property>
+
+  <!-- Block size = 128MB — đây là lý do target file size khi write cũng là 128MB -->
+  <!-- 1 file = 1 block = 1 unit của HDFS. File nhỏ hơn block size vẫn tốn 1 block metadata -->
+  <property>
+    <name>dfs.blocksize</name>
+    <value>134217728</value>
+  </property>
+
+  <!-- Cho phép append vào HDFS files (cần cho một số use cases) -->
+  <property>
+    <name>dfs.support.append</name>
+    <value>true</value>
+  </property>
+
+  <!-- Web UI của NameNode accessible từ ngoài container -->
+  <property>
+    <name>dfs.namenode.http-address</name>
+    <value>0.0.0.0:9870</value>
+  </property>
+
+  <!-- Tắt permission check trong dev — production phải bật -->
+  <property>
+    <name>dfs.permissions.enabled</name>
+    <value>false</value>
+  </property>
+
+  <!-- Enable HDFS Storage Policies (tiered storage) -->
+  <!-- Cho phép gán HOT/WARM/COLD policy cho từng directory -->
+  <property>
+    <name>dfs.storage.policy.enabled</name>
+    <value>true</value>
+  </property>
+
+  <!-- Khai báo storage types mà datanode cung cấp -->
+  <!-- SSD: simulate hot storage (raw/, staging/) -->
+  <!-- DISK: simulate cold storage (warm/, cold/) -->
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>[SSD]/hadoop/dfs/data/ssd,[DISK]/hadoop/dfs/data/hdd</value>
+  </property>
+</configuration>

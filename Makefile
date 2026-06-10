@@ -52,9 +52,17 @@ copy-data:
 	@echo "Done. Files in docker/source-db/init/data/:"
 	ls -lh docker/source-db/init/data/
 
+prepare-build:
+	@echo "Copying hadoop configs into service build contexts..."
+	mkdir -p docker/spark/hadoop-configs
+	cp docker/hadoop/core-site.xml docker/spark/hadoop-configs/
+	cp docker/hadoop/hdfs-site.xml docker/spark/hadoop-configs/
+	@echo "Build contexts ready."
+
 up:
 	@echo "Starting DE stack..."
-	docker compose -f docker/docker-compose.yml up -d
+	$(MAKE) prepare-build
+	docker compose -f docker/docker-compose.yml up -d --build
 	@echo ""
 	@echo "Services:"
 	@echo "  Source DB:      postgresql://localhost:5432/momo_source  (momo/momo)"
