@@ -41,6 +41,17 @@ download-jars:
 	@echo "Downloading JDBC drivers..."
 	bash docker/spark/download_jars.sh
 
+copy-data:
+	@echo "Copying raw data files into source-db init folder..."
+	mkdir -p docker/source-db/init/data
+	cp data/raw/transactions_data.csv docker/source-db/init/data/
+	cp data/raw/users_data.csv docker/source-db/init/data/
+	cp data/raw/cards_data.csv docker/source-db/init/data/
+	cp data/raw/mcc_codes.json docker/source-db/init/data/
+	cp data/raw/train_fraud_labels.json docker/source-db/init/data/
+	@echo "Done. Files in docker/source-db/init/data/:"
+	ls -lh docker/source-db/init/data/
+
 up:
 	@echo "Starting DE stack..."
 	docker compose -f docker/docker-compose.yml up -d

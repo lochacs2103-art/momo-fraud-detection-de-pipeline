@@ -1,9 +1,13 @@
 -- ============================================================
 -- Load data từ CSV/JSON vào source database
--- Script này chạy tự động khi PostgreSQL container khởi động lần đầu
--- Files CSV được mount vào /docker-entrypoint-initdb.d/data/
+-- 
+-- CSV files phải được copy vào docker/source-db/init/data/ trước khi
+-- chạy docker compose up.
 --
--- COPY là lệnh PostgreSQL để bulk load từ file — nhanh hơn INSERT nhiều lần
+-- Chạy lệnh này trước: make copy-data
+-- Hoặc thủ công:
+--   mkdir -p docker/source-db/init/data
+--   cp data/raw/* docker/source-db/init/data/
 -- ============================================================
 
 -- ---- Load transactions ----
@@ -16,9 +20,7 @@ FROM '/docker-entrypoint-initdb.d/data/transactions_data.csv'
 WITH (
     FORMAT csv,
     HEADER true,
-    NULL '',
-    QUOTE '"',
-    ESCAPE '\'
+    NULL ''
 );
 \echo 'Transactions loaded.'
 
@@ -34,9 +36,7 @@ FROM '/docker-entrypoint-initdb.d/data/users_data.csv'
 WITH (
     FORMAT csv,
     HEADER true,
-    NULL '',
-    QUOTE '"',
-    ESCAPE '\'
+    NULL ''
 );
 \echo 'Users loaded.'
 
@@ -51,20 +51,16 @@ FROM '/docker-entrypoint-initdb.d/data/cards_data.csv'
 WITH (
     FORMAT csv,
     HEADER true,
-    NULL '',
-    QUOTE '"',
-    ESCAPE '\'
+    NULL ''
 );
 \echo 'Cards loaded.'
 
--- ---- Load MCC codes từ JSON → cần dùng psql function ----
--- mcc_codes.json có dạng: {"0742": "Veterinary Services", ...}
--- PostgreSQL có thể đọc JSON và flatten thành rows
+-- ---- Load MCC codes từ JSON ----
 \echo 'Loading mcc_codes.json...'
 INSERT INTO raw_mcc_codes (mcc_code, description)
 SELECT
     key   AS mcc_code,
-    value AS description
+    TRIM(BOTH '"' FROM value::TEXT) AS description
 FROM (
     SELECT
         json_object_keys(content::json) AS key,
@@ -77,13 +73,11 @@ ON CONFLICT (mcc_code) DO NOTHING;
 \echo 'MCC codes loaded.'
 
 -- ---- Load fraud labels từ JSON ----
--- train_fraud_labels.json có dạng: {"transaction_id": "Yes", "txn_id2": "No", ...}
--- Value là "Yes"/"No" string, KHÔNG phải 0/1
 \echo 'Loading train_fraud_labels.json...'
 INSERT INTO raw_fraud_labels (transaction_id, is_fraud)
 SELECT
-    key            AS transaction_id,
-    TRIM(BOTH '"' FROM value::TEXT) AS is_fraud   -- strip quotes: '"Yes"' → 'Yes'
+    key AS transaction_id,
+    TRIM(BOTH '"' FROM value::TEXT) AS is_fraud
 FROM (
     SELECT
         json_object_keys(content::json) AS key,

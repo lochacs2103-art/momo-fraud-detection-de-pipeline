@@ -39,9 +39,11 @@ docker/spark/jars/
 logs/
 
 # Data files — KHÔNG commit raw data lên GitHub
-# Người dùng tự download hoặc generate
 data/raw/*.csv
 data/raw/*.json
+
+# source-db init data (copied locally before docker compose up)
+docker/source-db/init/data/
 
 # Docker volumes (local data, không commit)
 docker/volumes/

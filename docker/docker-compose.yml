@@ -53,18 +53,16 @@ services:
     container_name: source-db
     hostname: source-db
     ports:
-      - "5432:5432"   # Expose ra ngoài để dùng DBeaver/psql kiểm tra
+      - "5432:5432"
     environment:
       POSTGRES_DB: momo_source
       POSTGRES_USER: momo
       POSTGRES_PASSWORD: momo
     volumes:
       - source_db_data:/var/lib/postgresql/data
-      # Init scripts: chạy theo thứ tự alphabet khi container khởi động lần đầu
-      # 01_schema.sql  → tạo tables
-      # 02_load_data.sql → COPY từ CSV vào tables (mount data/ vào container)
       - ../docker/source-db/init:/docker-entrypoint-initdb.d:ro
-      - ../data/raw:/docker-entrypoint-initdb.d/data:ro   # CSV files accessible trong init script
+      # data/raw mount removed — CSV files will be copied into container manually
+      # or use COPY in init script with files pre-staged in init folder
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U momo -d momo_source"]
       interval: 10s
