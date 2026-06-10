@@ -26,8 +26,12 @@ cur = conn.cursor()
 print(f"Loading {FRAUD_LABELS_PATH}...")
 
 with open(FRAUD_LABELS_PATH) as f:
-    labels = json.load(f)
+    data = json.load(f)
 
+# Handle both formats:
+# Format 1: {"transaction_id": "Yes"/"No", ...}  (flat)
+# Format 2: {"target": {"transaction_id": "Yes"/"No", ...}}  (wrapped)
+labels = data.get("target", data)
 print(f"Total fraud labels: {len(labels)}")
 
 # Batch insert
