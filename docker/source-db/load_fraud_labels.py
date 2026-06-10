@@ -15,7 +15,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.parent
 FRAUD_LABELS_PATH = PROJECT_ROOT / "data" / "raw" / "train_fraud_labels.json"
 
 conn = psycopg2.connect(
-    host="localhost",
+    host="source-db",
     port=5432,
     dbname="momo_source",
     user="momo",
