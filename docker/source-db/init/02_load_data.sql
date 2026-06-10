@@ -73,21 +73,9 @@ ON CONFLICT (mcc_code) DO NOTHING;
 \echo 'MCC codes loaded.'
 
 -- ---- Load fraud labels từ JSON ----
-\echo 'Loading train_fraud_labels.json...'
-INSERT INTO raw_fraud_labels (transaction_id, is_fraud)
-SELECT
-    key AS transaction_id,
-    TRIM(BOTH '"' FROM value::TEXT) AS is_fraud
-FROM (
-    SELECT
-        json_object_keys(content::json) AS key,
-        content::json -> json_object_keys(content::json) AS value
-    FROM (
-        SELECT pg_read_file('/docker-entrypoint-initdb.d/data/train_fraud_labels.json') AS content
-    ) t
-) kv
-ON CONFLICT (transaction_id) DO NOTHING;
-\echo 'Fraud labels loaded.'
+-- NOTE: fraud_labels.json quá lớn cho pg_read_file()
+-- Dùng script Python thay thế: python docker/source-db/load_fraud_labels.py
+\echo 'Skipping fraud labels (use load_fraud_labels.py instead)'
 
 -- ---- Summary ----
 \echo ''
