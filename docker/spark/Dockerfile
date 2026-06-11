@@ -7,8 +7,8 @@ USER root
 RUN pip install --no-cache-dir \
     pyyaml==6.0.1 \
     structlog==23.2.0 \
-    pandas==2.1.4 \
-    pyarrow==14.0.1
+    pandas==1.5.3 \
+    pyarrow==11.0.0
 
 # Copy Spark config
 COPY spark-defaults.conf /opt/spark/conf/spark-defaults.conf
