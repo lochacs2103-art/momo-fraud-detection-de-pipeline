@@ -46,16 +46,9 @@
     <value>false</value>
   </property>
 
-  <!-- Enable HDFS Storage Policies (tiered storage) -->
-  <!-- Cho phép gán HOT/WARM/COLD policy cho từng directory -->
+  <!-- Enable HDFS Storage Policies -->
   <property>
     <name>dfs.storage.policy.enabled</name>
     <value>true</value>
-  </property>
-
-  <!-- Khai báo storage directories cho datanode -->
-  <property>
-    <name>dfs.datanode.data.dir</name>
-    <value>/hadoop/dfs/data/ssd,/hadoop/dfs/data/hdd</value>
   </property>
 </configuration>

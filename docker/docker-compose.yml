@@ -83,10 +83,8 @@ services:
       CORE_CONF_fs_defaultFS: hdfs://namenode:9000
       HDFS_CONF_dfs_replication: 1
       HDFS_CONF_dfs_permissions_enabled: "false"
-      HDFS_CONF_dfs_datanode_data_dir: "/hadoop/dfs/data/ssd,/hadoop/dfs/data/hdd"
     volumes:
-      - datanode_ssd:/hadoop/dfs/data/ssd
-      - datanode_hdd:/hadoop/dfs/data/hdd
+      - datanode_data:/hadoop/dfs/data
     depends_on:
       namenode:
         condition: service_healthy
@@ -326,10 +324,8 @@ networks:
 volumes:
   namenode_data:
     name: de_namenode_data
-  datanode_ssd:
-    name: de_datanode_ssd
-  datanode_hdd:
-    name: de_datanode_hdd
+  datanode_data:
+    name: de_datanode_data
   source_db_data:
     name: de_source_db_data
   hive_metastore_db:
