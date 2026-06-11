@@ -83,7 +83,7 @@ services:
       CORE_CONF_fs_defaultFS: hdfs://namenode:9000
       HDFS_CONF_dfs_replication: 1
       HDFS_CONF_dfs_permissions_enabled: "false"
-      HDFS_CONF_dfs_datanode_data_dir: "[SSD]/hadoop/dfs/data/ssd,[DISK]/hadoop/dfs/data/hdd"
+      HDFS_CONF_dfs_datanode_data_dir: "/hadoop/dfs/data/ssd,/hadoop/dfs/data/hdd"
     volumes:
       - datanode_ssd:/hadoop/dfs/data/ssd
       - datanode_hdd:/hadoop/dfs/data/hdd

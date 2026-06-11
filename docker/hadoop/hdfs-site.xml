@@ -53,11 +53,9 @@
     <value>true</value>
   </property>
 
-  <!-- Khai báo storage types mà datanode cung cấp -->
-  <!-- SSD: simulate hot storage (raw/, staging/) -->
-  <!-- DISK: simulate cold storage (warm/, cold/) -->
+  <!-- Khai báo storage directories cho datanode -->
   <property>
     <name>dfs.datanode.data.dir</name>
-    <value>[SSD]/hadoop/dfs/data/ssd,[DISK]/hadoop/dfs/data/hdd</value>
+    <value>/hadoop/dfs/data/ssd,/hadoop/dfs/data/hdd</value>
   </property>
 </configuration>
