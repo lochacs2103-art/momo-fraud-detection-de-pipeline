@@ -2,11 +2,18 @@ FROM apache/spark:3.5.1
 
 USER root
 
+# Install Python dependencies vào image luôn
+# Không cần pip install mỗi lần chạy
+RUN pip install --no-cache-dir \
+    pyyaml==6.0.1 \
+    structlog==23.2.0 \
+    pandas==2.1.4 \
+    pyarrow==14.0.1
+
 # Copy Spark config
 COPY spark-defaults.conf /opt/spark/conf/spark-defaults.conf
 
 # Copy Hadoop configs (needed for HDFS connectivity)
-# These are copied into spark folder during build via copy-hadoop-configs target
 COPY hadoop-configs/core-site.xml /opt/spark/conf/core-site.xml
 COPY hadoop-configs/hdfs-site.xml /opt/spark/conf/hdfs-site.xml
 
