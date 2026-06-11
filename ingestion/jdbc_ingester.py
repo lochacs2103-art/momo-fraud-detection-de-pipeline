@@ -67,7 +67,7 @@ class JDBCIngester(BaseIngester):
             "fetchsize": str(self.db_config.get("fetch_size", 10000)),
         }
 
-    def _get_bounds(self, table: str, column: str) -> tuple[int, int]:
+    def _get_bounds(self, table: str, column: str):
         """
         Query min/max của partition column để Spark biết range để chia.
         Chạy 1 query nhỏ trước khi đọc toàn bộ data.
