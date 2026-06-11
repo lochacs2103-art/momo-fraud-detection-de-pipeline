@@ -17,7 +17,8 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 # Project root — tìm config files tương đối từ đây
-PROJECT_ROOT = Path(__file__).parent.parent
+import os
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).parent.parent))
 
 
 def _load_spark_config() -> dict:

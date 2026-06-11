@@ -27,7 +27,8 @@ import structlog
 from ingestion.base_ingester import BaseIngester
 
 logger = structlog.get_logger(__name__)
-PROJECT_ROOT = Path(__file__).parent.parent
+import os
+PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).parent.parent))
 
 
 class JDBCIngester(BaseIngester):
