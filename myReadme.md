@@ -304,3 +304,87 @@ Thẻ mới mở < 3 tháng mà đã có giao dịch lớn là pattern của sto
 
 Đây là nguyên tắc cốt lõi của data engineering: **clean once, serve many**. Staging layer làm sạch một lần, sau đó warehouse/dbt/ML/analyst đều dùng data đã sạch đó — không ai phải tự clean nữa.
 
+
+---
+
+## [Session 3] — Backfill vs Daily Incremental (để giảng sau)
+
+### Câu hỏi: Trong thực tế người ta chạy pipeline theo gì?
+
+**Có 2 scenario hoàn toàn khác nhau:**
+
+---
+
+### Scenario 1: Backfill lần đầu (historical data load)
+
+Khi hệ thống mới deploy, cần xử lý toàn bộ data cũ (ví dụ 10 năm).
+
+**Cách sai (intern hay làm):** chạy từng ngày bằng for loop bash
+- 3650 ngày × 1 phút/ngày = ~60 giờ chạy tuần tự
+- Nếu máy tắt → mất hết tiến độ
+
+**Cách đúng trong production:** Airflow backfill với max_active_runs
+
+```bash
+airflow dags backfill fraud_data_pipeline \
+  --start-date 2010-01-01 \
+  --end-date 2019-12-31
+```
+
+Với `max_active_runs=8`: Airflow tạo 3650 DAG runs, chạy 8 ngày song song cùng lúc.
+3650 / 8 = ~456 batches → nhanh hơn 8x so với tuần tự.
+
+**Tại sao Airflow tốt hơn bash loop:**
+- Retry tự động nếu 1 ngày fail (bash loop thì mất)
+- Monitor được từng ngày đã xong chưa
+- Có thể resume từ ngày bị fail
+- Song song thật sự, không phải chờ ngày này xong mới chạy ngày kia
+
+---
+
+### Scenario 2: Daily incremental (production ongoing)
+
+Sau khi backfill xong, pipeline chạy **tự động hàng ngày**:
+
+```
+Mỗi ngày 02:00 AM:
+  Airflow scheduler check → trigger DAG run cho execution_date = hôm qua
+  → ingest 1 ngày mới → staging → warehouse → done
+  Thời gian: 10-30 phút/ngày
+```
+
+Không cần làm gì thủ công — Airflow tự schedule theo `schedule_interval="0 2 * * *"`.
+
+---
+
+### Cho project này (static dataset)
+
+Dataset không có new data coming → đây là backfill scenario thuần túy.
+
+**Cách làm trong project (đơn giản hóa):**
+- Chạy bash loop nền với `nohup`
+- Mỗi iteration submit 1 Spark job cho 1 ngày
+- Đủ để demo end-to-end flow
+
+**Cách nói khi phỏng vấn:**
+> "Dataset này là historical data nên tôi dùng backfill approach. Trong production, tôi sẽ dùng Airflow backfill với max_active_runs=8 để chạy song song 8 ngày cùng lúc, giảm thời gian xử lý 8 lần. Sau khi backfill xong, daily incremental chạy tự động qua Airflow scheduler."
+
+---
+
+### Catchup=True trong Airflow DAG là gì?
+
+```python
+DAG(
+    dag_id="fraud_data_pipeline",
+    schedule_interval="0 2 * * *",
+    catchup=True,    # ← quan trọng
+    start_date=datetime(2010, 1, 1),
+)
+```
+
+`catchup=True`: khi DAG được enable lần đầu, Airflow tự động tạo DAG runs cho tất cả ngày từ `start_date` đến hôm nay — đây chính là backfill tự động.
+
+`catchup=False`: chỉ chạy từ ngày hôm nay trở đi, bỏ qua quá khứ.
+
+Đây là lý do tại sao architecture đã set `catchup=True` từ đầu — nó handle backfill tự động mà không cần lệnh riêng.
+
