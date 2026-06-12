@@ -68,7 +68,11 @@ def enrich_transactions_full(spark: SparkSession) -> dict:
     # Sort-merge join cho fraud labels (lớn)
     df = df.join(fraud_df, on="transaction_id", how="left")
 
-    # Write — repartition nhỏ hơn để tránh OOM
+    # Checkpoint để break long lineage chain → tránh StackOverflowError
+    spark.sparkContext.setCheckpointDir("hdfs://namenode:9000/tmp/spark-checkpoint")
+    df = df.checkpoint()
+
+    # Write
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
     df.repartition(F.col("year"), F.col("month"), F.col("day")) \
