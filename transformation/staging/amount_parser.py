@@ -13,7 +13,7 @@ from typing import Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import DoubleType, StringType, StructField, StructType
+from pyspark.sql.types import DoubleType, StringType, StructField, StructType, DecimalType
 
 
 class AmountFormat(Enum):
