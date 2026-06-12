@@ -41,9 +41,8 @@ def enrich_year(spark, df, mcc_df, cards_df, year, staging_path):
         .partitionBy("year", "month", "day") \
         .parquet(staging_path)
 
-    count = df_year.count()
-    logger.info("enrich_year.done", year=year, count=count)
-    return count
+    logger.info("enrich_year.done", year=year)
+    return 0  # count already tracked from staging
 
 
 def enrich_transactions_full(spark: SparkSession) -> dict:
