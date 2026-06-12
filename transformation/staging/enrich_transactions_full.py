@@ -14,17 +14,16 @@ PROJECT_ROOT = Path(os.environ.get("PROJECT_ROOT", Path(__file__).parent.parent.
 logger = structlog.get_logger(__name__)
 
 
-def enrich_year(spark, df, mcc_df, cards_df, fraud_df, year, staging_path):
-    """Enrich 1 năm, write ngay, giải phóng memory."""
+def enrich_year(spark, df, mcc_df, cards_df, year, staging_path):
+    """Enrich 1 năm với mcc + cards. Fraud labels join ở warehouse layer."""
     df_year = df.filter(F.col("year") == year)
 
-    # Drop existing enriched cols
     cols_to_drop = [c for c in ["mcc_description", "card_brand", "card_type",
-                                 "card_on_dark_web", "is_fraud"] if c in df_year.columns]
+                                 "card_on_dark_web"] if c in df_year.columns]
     if cols_to_drop:
         df_year = df_year.drop(*cols_to_drop)
 
-    # Broadcast joins (small tables)
+    # Broadcast joins — cả 2 đều nhỏ, không gây OOM
     df_year = df_year.join(F.broadcast(mcc_df), on="mcc", how="left")
     df_year = df_year.withColumn(
         "mcc_description",
@@ -33,7 +32,6 @@ def enrich_year(spark, df, mcc_df, cards_df, fraud_df, year, staging_path):
          .otherwise(F.col("mcc_description"))
     )
     df_year = df_year.join(F.broadcast(cards_df), on="card_id", how="left")
-    df_year = df_year.join(F.broadcast(fraud_df), on="transaction_id", how="left")
 
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
     df_year \
@@ -55,13 +53,10 @@ def enrich_transactions_full(spark: SparkSession) -> dict:
     staging_path = cfg["tables"]["transactions"]["staging"]
     mcc_path     = cfg["tables"]["mcc_codes"]["staging"]
     cards_path   = cfg["tables"]["cards"]["staging"]
-    fraud_path   = cfg["lake"]["raw"] + "/fraud_labels"
 
     spark.conf.set("spark.sql.shuffle.partitions", "50")
-
     logger.info("enrich_transactions_full.start")
 
-    # Load dim tables một lần — broadcast vì nhỏ
     mcc_df = spark.read.parquet(mcc_path) \
         .select("mcc", "mcc_description").dropDuplicates(["mcc"])
 
@@ -71,33 +66,18 @@ def enrich_transactions_full(spark: SparkSession) -> dict:
     cards_df = cards_df.select("card_id", "card_brand", "card_type", "card_on_dark_web") \
         .dropDuplicates(["card_id"])
 
-    # Fraud labels: cache vì dùng nhiều lần (10 years)
-    fraud_df = spark.read.parquet(fraud_path) \
-        .select(
-            F.col("transaction_id"),
-            (F.upper(F.col("is_fraud")) == "YES").cast("boolean").alias("is_fraud")
-        ).dropDuplicates(["transaction_id"]) \
-        .cache()
-    fraud_df.count()  # materialize cache
-    logger.info("fraud_labels.cached")
-
-    # Cache mcc và cards cũng để tái dùng
     mcc_df.cache(); mcc_df.count()
     cards_df.cache(); cards_df.count()
 
-    # Load staging transactions 1 lần
     df = spark.read.parquet(staging_path)
 
     total = 0
-    years = [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
-
-    for year in years:
+    for year in [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]:
         logger.info("enrich_year.start", year=year)
-        count = enrich_year(spark, df, mcc_df, cards_df, fraud_df, year, staging_path)
+        count = enrich_year(spark, df, mcc_df, cards_df, year, staging_path)
         total += count
-        logger.info("enrich_year.done", year=year, count=count, total_so_far=total)
+        logger.info("progress", year=year, done=count, total_so_far=total)
 
-    fraud_df.unpersist()
     mcc_df.unpersist()
     cards_df.unpersist()
 
