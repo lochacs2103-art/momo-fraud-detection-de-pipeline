@@ -47,6 +47,9 @@ def enrich_transactions_full(spark: SparkSession) -> dict:
         ).dropDuplicates(["transaction_id"])
 
     # Broadcast joins
+    # Drop mcc_description cũ nếu đã có (từ clean step)
+    if "mcc_description" in df.columns:
+        df = df.drop("mcc_description")
     df = df.join(F.broadcast(mcc_df), on="mcc", how="left")
     df = df.withColumn(
         "mcc_description",
