@@ -183,7 +183,7 @@ def apply_amount_parser(df: DataFrame, raw_col: str = "amount") -> DataFrame:
     result_schema = StructType([
         StructField("amount",             DoubleType(),  True),
         StructField("amount_currency",    StringType(),  True),
-        StructField("amount_format",      StringType(),  False),
+        StructField("amount_format",      StringType(),  True),
         StructField("amount_parse_note",  StringType(),  True),
     ])
 
