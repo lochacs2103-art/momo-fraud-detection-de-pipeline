@@ -67,6 +67,7 @@ def _cast_types(df: DataFrame) -> DataFrame:
         .withColumn("transaction_date",
                     F.to_timestamp(F.col("date"), "yyyy-MM-dd HH:mm:ss")) \
         .withColumnRenamed("client_id", "user_id") \
+        .withColumnRenamed("use_chip", "use_chip_raw") \
         .withColumn("mcc", F.col("mcc").cast("int")) \
         .drop("id", "date")
 
@@ -136,14 +137,12 @@ def _encode_use_chip(df: DataFrame) -> DataFrame:
     0=SWIPE, 1=CHIP, 2=ONLINE
     """
     chip_map_expr = (
-        F.when(F.col("use_chip") == "Swipe Transaction",  F.lit(0))
-         .when(F.col("use_chip") == "Chip Transaction",   F.lit(1))
-         .when(F.col("use_chip") == "Online Transaction", F.lit(2))
+        F.when(F.col("use_chip_raw") == "Swipe Transaction",  F.lit(0))
+         .when(F.col("use_chip_raw") == "Chip Transaction",   F.lit(1))
+         .when(F.col("use_chip_raw") == "Online Transaction", F.lit(2))
          .otherwise(F.lit(None).cast("int"))
     )
-    return df \
-        .withColumnRenamed("use_chip", "use_chip_raw") \
-        .withColumn("use_chip", chip_map_expr)
+    return df.withColumn("use_chip", chip_map_expr)
 
 
 def _explode_errors(df: DataFrame) -> DataFrame:
