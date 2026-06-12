@@ -202,7 +202,7 @@ def apply_amount_parser(df: DataFrame, raw_col: str = "amount") -> DataFrame:
 
     parsed = df.withColumn("_parsed", _parse_udf(F.col(raw_col)))
 
-    return df \
+    return parsed \
         .withColumnRenamed(raw_col, "amount_raw") \
         .withColumn("amount",            F.col("_parsed").getField("amount").cast(DecimalType(18,2))) \
         .withColumn("amount_currency",   F.col("_parsed").getField("amount_currency")) \
