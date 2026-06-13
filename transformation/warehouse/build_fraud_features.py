@@ -130,47 +130,91 @@ def build_fraud_features(spark: SparkSession, execution_date: date) -> dict:
     return {"date": execution_date.isoformat(), "row_count": row_count}
 
 
+def build_fraud_features_full(spark: SparkSession) -> dict:
+    """
+    Backfill mode: tính features cho TOÀN BỘ data trong 1 Spark job.
+    Không loop theo ngày — 1 job duy nhất, Spark tự parallel hóa.
+    """
+    with open(PROJECT_ROOT / "config" / "hdfs.yaml") as f:
+        cfg = yaml.safe_load(f)
+
+    staging_path  = cfg["tables"]["transactions"]["staging"]
+    features_path = cfg["lake"]["warehouse"] + "/feat_fraud_features"
+
+    df = spark.read.parquet(staging_path).filter(F.col("is_valid") == True)
+    df = df.withColumn("ts", F.unix_timestamp("transaction_date"))
+
+    w_user = Window.partitionBy("user_id").orderBy("ts")
+    w_1h   = w_user.rangeBetween(-3600,   Window.currentRow)
+    w_24h  = w_user.rangeBetween(-86400,  Window.currentRow)
+    w_7d   = w_user.rangeBetween(-604800, Window.currentRow)
+    w_user_all = Window.partitionBy("user_id").orderBy("ts") \
+        .rowsBetween(Window.unboundedPreceding, Window.currentRow)
+
+    df = df \
+        .withColumn("txn_count_last_1h",   F.count("transaction_id").over(w_1h)) \
+        .withColumn("txn_count_last_24h",  F.count("transaction_id").over(w_24h)) \
+        .withColumn("txn_count_last_7d",   F.count("transaction_id").over(w_7d)) \
+        .withColumn("amount_sum_last_1h",  F.sum("amount").over(w_1h)) \
+        .withColumn("amount_sum_last_24h", F.sum("amount").over(w_24h)) \
+        .withColumn("user_avg_amount",     F.avg("amount").over(w_user_all)) \
+        .withColumn("amount_vs_user_avg_ratio",
+            F.when(F.col("user_avg_amount") > 0,
+                   F.col("amount") / F.col("user_avg_amount")
+            ).otherwise(F.lit(None))
+        ) \
+        .withColumn("is_night_txn",  F.hour("transaction_date").between(0, 5)) \
+        .withColumn("is_weekend",    F.dayofweek("transaction_date").isin([1, 7])) \
+        .withColumn("is_foreign_merchant",
+            ~F.col("merchant_state").isin([
+                "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
+                "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
+                "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ",
+                "NM","NY","NC","ND","OH","OK","OR","PA","RI","SC",
+                "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"
+            ])
+        )
+
+    df_features = df.select(
+        "transaction_id", "user_id",
+        "txn_count_last_1h", "txn_count_last_24h", "txn_count_last_7d",
+        "amount_sum_last_1h", "amount_sum_last_24h",
+        "amount_vs_user_avg_ratio",
+        "is_night_txn", "is_weekend", "is_foreign_merchant",
+        "card_on_dark_web",
+        "is_fraud",
+        F.lit(None).cast("double").alias("risk_score"),
+        "_batch_id",
+        "year", "month", "day",
+    )
+
+    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    df_features \
+        .repartition(F.col("year"), F.col("month"), F.col("day")) \
+        .write \
+        .mode("overwrite") \
+        .option("compression", "snappy") \
+        .partitionBy("year", "month", "day") \
+        .parquet(features_path)
+
+    row_count = df_features.count()
+    logger.info("build_fraud_features_full.done", row_count=row_count)
+    return {"row_count": row_count}
+
+
 if __name__ == "__main__":
     import sys
     from ingestion.spark_session import get_spark_session, stop_spark_session
 
-    # execution_date argument: "2019-01-15" hoặc không truyền → chạy toàn bộ data
-    # Khi backfill: truyền từng ngày. Khi production: Airflow truyền execution_date.
-    if len(sys.argv) > 1:
-        exec_date = date.fromisoformat(sys.argv[1])
-        spark = get_spark_session("build_fraud_features")
-        try:
+    spark = get_spark_session("build_fraud_features")
+    try:
+        if len(sys.argv) > 1:
+            # Single date mode: spark-submit ... build_fraud_features.py 2019-06-15
+            exec_date = date.fromisoformat(sys.argv[1])
             result = build_fraud_features(spark, exec_date)
-            print(f"\n=== DONE: {result} ===")
-        finally:
-            stop_spark_session(spark)
-    else:
-        # Backfill mode: chạy tất cả các ngày có trong staging
-        # Đọc distinct year/month/day từ staging rồi loop
-        spark = get_spark_session("build_fraud_features_backfill")
-        try:
-            import yaml
-            from pathlib import Path
-            import os
-            PROJECT_ROOT_PATH = Path(os.environ.get("PROJECT_ROOT", Path(__file__).parent.parent.parent))
-            with open(PROJECT_ROOT_PATH / "config" / "hdfs.yaml") as f:
-                cfg = yaml.safe_load(f)
-
-            staging_path = cfg["tables"]["transactions"]["staging"]
-            dates_df = spark.read.parquet(staging_path) \
-                .select("year", "month", "day") \
-                .distinct() \
-                .orderBy("year", "month", "day") \
-                .collect()
-
-            print(f"Found {len(dates_df)} distinct dates to process")
-            total = 0
-            for row in dates_df:
-                d = date(row["year"], row["month"], row["day"])
-                result = build_fraud_features(spark, d)
-                total += result["row_count"]
-                print(f"  ✓ {d.isoformat()} → {result['row_count']} rows")
-
-            print(f"\n=== BACKFILL DONE: {total} total rows ===")
-        finally:
-            stop_spark_session(spark)
+        else:
+            # Backfill mode: toàn bộ data trong 1 job
+            result = build_fraud_features_full(spark)
+        print(f"\n=== DONE: {result} ===")
+    finally:
+        stop_spark_session(spark)
