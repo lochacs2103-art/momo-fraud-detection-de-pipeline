@@ -144,17 +144,18 @@ def build_dim_users(spark: SparkSession) -> dict:
 
     # ── 6. Union tất cả lại ──────────────────────────────────────────
     result_df = unchanged_rows \
-        .unionByName(rows_to_close) \
-        .unionByName(new_rows)
+        .unionByName(rows_to_close, allowMissingColumns=True) \
+        .unionByName(new_rows, allowMissingColumns=True)
+
+    # count() TRƯỚC write() để tránh re-execute SCD2 logic lần 2
+    inserted_count = new_rows.count()
+    updated_count  = rows_to_close.count()
+    total_count    = result_df.count()
 
     result_df.write \
         .mode("overwrite") \
         .option("compression", "snappy") \
         .parquet(dim_path)
-
-    inserted_count = new_rows.count()
-    updated_count  = rows_to_close.count()
-    total_count    = result_df.count()
 
     logger.info("build_dim_users.done",
                 inserted=inserted_count,

@@ -107,15 +107,16 @@ def clean_transactions_full(spark: SparkSession) -> dict:
     # Write staging — repartition by year/month/day
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
+    # count() TRƯỚC write() — tránh re-execute lineage 13.3M rows lần 2
+    valid_count      = df_valid.count()
+    quarantine_count = df_quarantine.count()
+
     df_valid \
         .repartition(F.col("year"), F.col("month"), F.col("day")) \
         .write.mode("overwrite") \
         .option("compression", "snappy") \
         .partitionBy("year", "month", "day") \
         .parquet(staging_path)
-
-    valid_count = df_valid.count()
-    quarantine_count = df_quarantine.count()
 
     if quarantine_count > 0:
         df_quarantine.write.mode("overwrite") \

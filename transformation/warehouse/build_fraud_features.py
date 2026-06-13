@@ -128,3 +128,49 @@ def build_fraud_features(spark: SparkSession, execution_date: date) -> dict:
                 row_count=row_count)
 
     return {"date": execution_date.isoformat(), "row_count": row_count}
+
+
+if __name__ == "__main__":
+    import sys
+    from ingestion.spark_session import get_spark_session, stop_spark_session
+
+    # execution_date argument: "2019-01-15" hoặc không truyền → chạy toàn bộ data
+    # Khi backfill: truyền từng ngày. Khi production: Airflow truyền execution_date.
+    if len(sys.argv) > 1:
+        exec_date = date.fromisoformat(sys.argv[1])
+        spark = get_spark_session("build_fraud_features")
+        try:
+            result = build_fraud_features(spark, exec_date)
+            print(f"\n=== DONE: {result} ===")
+        finally:
+            stop_spark_session(spark)
+    else:
+        # Backfill mode: chạy tất cả các ngày có trong staging
+        # Đọc distinct year/month/day từ staging rồi loop
+        spark = get_spark_session("build_fraud_features_backfill")
+        try:
+            import yaml
+            from pathlib import Path
+            import os
+            PROJECT_ROOT_PATH = Path(os.environ.get("PROJECT_ROOT", Path(__file__).parent.parent.parent))
+            with open(PROJECT_ROOT_PATH / "config" / "hdfs.yaml") as f:
+                cfg = yaml.safe_load(f)
+
+            staging_path = cfg["tables"]["transactions"]["staging"]
+            dates_df = spark.read.parquet(staging_path) \
+                .select("year", "month", "day") \
+                .distinct() \
+                .orderBy("year", "month", "day") \
+                .collect()
+
+            print(f"Found {len(dates_df)} distinct dates to process")
+            total = 0
+            for row in dates_df:
+                d = date(row["year"], row["month"], row["day"])
+                result = build_fraud_features(spark, d)
+                total += result["row_count"]
+                print(f"  ✓ {d.isoformat()} → {result['row_count']} rows")
+
+            print(f"\n=== BACKFILL DONE: {total} total rows ===")
+        finally:
+            stop_spark_session(spark)

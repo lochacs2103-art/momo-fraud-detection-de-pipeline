@@ -54,12 +54,14 @@ def build_dim_cards(spark: SparkSession) -> dict:
     # ── SCD Type 1: overwrite hoàn toàn ──────────────────────────────
     # Không cần merge phức tạp — chỉ cần latest snapshot
     # Write mode overwrite: thay thế toàn bộ dim_cards bằng staging mới nhất
+    # count() TRƯỚC write() để tránh re-execute lineage lần 2
+    count = staging_df.count()
+
     staging_df.write \
         .mode("overwrite") \
         .option("compression", "snappy") \
         .parquet(dim_path)
 
-    count = staging_df.count()
     logger.info("build_dim_cards.done", total=count)
 
     return {"total": count}

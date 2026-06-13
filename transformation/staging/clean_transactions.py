@@ -265,16 +265,17 @@ def clean_transactions(
         .partitionBy("year", "month", "day") \
         .parquet(staging_path)
 
-    if df_quarantine.count() > 0:
+    # count() TRƯỚC write() để tránh re-execute lineage lần 2
+    valid_count      = df_valid.count()
+    quarantine_count = df_quarantine.count()
+
+    if quarantine_count > 0:
         # Dùng overwrite dynamic partition — idempotent như valid data
         # Chạy lại cùng ngày → overwrite đúng partition đó, không duplicate
         df_quarantine.write.mode("overwrite") \
             .option("compression", "snappy") \
             .partitionBy("year", "month", "day") \
             .parquet(quarantine_path)
-
-    valid_count      = df_valid.count()
-    quarantine_count = df_quarantine.count()
 
     logger.info("clean_transactions.done",
                 date=execution_date.isoformat(),
