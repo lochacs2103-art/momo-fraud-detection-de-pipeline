@@ -175,14 +175,21 @@ def build_fraud_features_full(spark: SparkSession) -> dict:
             ])
         )
 
+    # is_fraud: fraud_labels không được join ở staging (OOM với 8.9M rows)
+    # → NULL ở đây, sẽ được join ở dbt/warehouse layer sau
+    # card_on_dark_web: chỉ có sau enrich, có thể NULL nếu chưa enrich
+    card_on_dark_web_col = F.col("card_on_dark_web") \
+        if "card_on_dark_web" in df.columns \
+        else F.lit(None).cast("boolean")
+
     df_features = df.select(
         "transaction_id", "user_id",
         "txn_count_last_1h", "txn_count_last_24h", "txn_count_last_7d",
         "amount_sum_last_1h", "amount_sum_last_24h",
         "amount_vs_user_avg_ratio",
         "is_night_txn", "is_weekend", "is_foreign_merchant",
-        "card_on_dark_web",
-        "is_fraud",
+        card_on_dark_web_col.alias("card_on_dark_web"),
+        F.lit(None).cast("boolean").alias("is_fraud"),   # populated in warehouse/dbt
         F.lit(None).cast("double").alias("risk_score"),
         "_batch_id",
         "year", "month", "day",
