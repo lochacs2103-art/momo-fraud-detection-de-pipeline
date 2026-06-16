@@ -12,7 +12,7 @@ SELECT
 
     -- Amount (5 cột từ AmountParser)
     amount_raw,
-    amount,
+    CAST(amount AS DOUBLE)  AS amount,  -- DECIMAL(18,2) trong Parquet → cast DOUBLE cho dbt/Trino compat
     amount_currency,
     amount_format,
     amount_parse_note,

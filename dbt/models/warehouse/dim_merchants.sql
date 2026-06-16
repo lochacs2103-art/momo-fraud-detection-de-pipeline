@@ -3,7 +3,6 @@
 
 {{ config(materialized='table') }}
 
--- fraud_rate phải tính lại trong CASE vì Trino không cho dùng alias trong cùng SELECT
 WITH merchant_agg AS (
     SELECT
         merchant_id,
@@ -19,7 +18,8 @@ WITH merchant_agg AS (
             4
         )                                                              AS fraud_rate,
         AVG(CAST(amount AS DOUBLE))                                    AS avg_amount,
-        CURRENT_TIMESTAMP                                              AS _updated_at
+        -- CAST to timestamp (no timezone) — Hive/Parquet không support timestamp with timezone
+        CAST(CURRENT_TIMESTAMP AS timestamp)                           AS _updated_at
     FROM {{ ref('stg_transactions') }}
     WHERE merchant_id IS NOT NULL
     GROUP BY merchant_id
