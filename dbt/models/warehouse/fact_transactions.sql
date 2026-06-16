@@ -26,7 +26,7 @@ SELECT
     t.merchant_id,
     t.merchant_city,
     t.merchant_state,
-    t.amount,
+    CAST(t.amount AS DOUBLE)        AS amount,
     t.amount_currency,
     t.is_refund,
     t.is_online_transaction,

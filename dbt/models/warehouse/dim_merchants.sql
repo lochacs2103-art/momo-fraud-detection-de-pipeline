@@ -18,8 +18,8 @@ WITH merchant_agg AS (
             4
         )                                                              AS fraud_rate,
         AVG(CAST(amount AS DOUBLE))                                    AS avg_amount,
-        -- CAST to timestamp (no timezone) — Hive/Parquet không support timestamp with timezone
-        CAST(CURRENT_TIMESTAMP AS timestamp)                           AS _updated_at
+        -- localtimestamp trả về timestamp không có timezone — Hive/Parquet compatible
+        localtimestamp                                                 AS _updated_at
     FROM {{ ref('stg_transactions') }}
     WHERE merchant_id IS NOT NULL
     GROUP BY merchant_id
