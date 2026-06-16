@@ -1,16 +1,7 @@
 -- dim_users.sql
---
--- ⚠ SCD Type 2 NOTE:
--- dbt incremental với unique_key='user_id' thực hiện MERGE/UPSERT —
--- tức là UPDATE row cũ khi user_id đã tồn tại → đây là SCD Type 1 behavior.
---
--- SCD Type 2 thật sự (expire old rows, insert new rows với valid_from/valid_to)
--- được implement trong: transformation/warehouse/build_dim_users.py (Spark job)
--- Spark job đó chạy TRƯỚC dbt trong Airflow DAG.
---
--- Model này chỉ là VIEW/incremental để Trino + Superset query được dim_users
--- sau khi Spark job đã build đúng SCD2 structure trên HDFS.
--- → Không duplicate logic, không conflict.
+-- Đọc từ stg_users (staging view) thay vì hive.warehouse.dim_users
+-- Lý do: warehouse.dim_users Parquet có schema conflict với Hive DDL
+-- dbt tự tạo table mới với schema đúng từ staging
 
 {{ config(
     materialized='incremental',
@@ -19,32 +10,31 @@
     on_schema_change='sync_all_columns'
 ) }}
 
--- Đọc từ HDFS path mà build_dim_users.py (Spark SCD2) đã write
--- Chỉ expose current rows để downstream (fact joins, Superset) dùng
 SELECT
     user_id,
-    CAST(current_age AS INTEGER)       AS current_age,
+    CAST(current_age AS INTEGER)             AS current_age,
     age_group,
-    CAST(retirement_age AS INTEGER)    AS retirement_age,
+    CAST(retirement_age AS INTEGER)          AS retirement_age,
     gender,
     address,
-    CAST(latitude AS DOUBLE)           AS latitude,
-    CAST(longitude AS DOUBLE)          AS longitude,
-    CAST(per_capita_income AS DOUBLE)  AS per_capita_income,
-    CAST(yearly_income AS DOUBLE)      AS yearly_income,
-    CAST(total_debt AS DOUBLE)         AS total_debt,
-    CAST(credit_score AS INTEGER)      AS credit_score,
+    CAST(latitude AS DOUBLE)                 AS latitude,
+    CAST(longitude AS DOUBLE)                AS longitude,
+    CAST(per_capita_income AS DOUBLE)        AS per_capita_income,
+    CAST(yearly_income AS DOUBLE)            AS yearly_income,
+    CAST(total_debt AS DOUBLE)               AS total_debt,
+    CAST(credit_score AS INTEGER)            AS credit_score,
     credit_score_band,
     is_invalid_credit_score,
-    CAST(num_credit_cards AS INTEGER)  AS num_credit_cards,
-    valid_from,
-    valid_to,
-    is_current,
+    CAST(num_credit_cards AS INTEGER)        AS num_credit_cards,
+    -- SCD2 columns: dbt incremental = SCD1 behavior
+    -- Full SCD2 history kept in hive.warehouse.dim_users (Spark-built)
+    CAST(NULL AS timestamp)                  AS valid_from,
+    CAST(NULL AS timestamp)                  AS valid_to,
+    CAST(true AS boolean)                    AS is_current,
     _batch_id
 
-FROM hive.warehouse.dim_users
+FROM {{ ref('stg_users') }}
 
 {% if is_incremental() %}
--- Chỉ sync rows được Spark job update trong batch gần nhất
-WHERE _batch_id = (SELECT MAX(_batch_id) FROM hive.warehouse.dim_users)
+WHERE _batch_id = (SELECT MAX(_batch_id) FROM {{ this }})
 {% endif %}
