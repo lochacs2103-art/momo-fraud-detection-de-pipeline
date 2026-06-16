@@ -4,6 +4,7 @@ momo_fraud:
     dev:
       type: trino
       method: none
+      user: airflow
       host: trino
       port: 8080
       database: hive        # Trino catalog name
@@ -13,6 +14,7 @@ momo_fraud:
     prod:
       type: trino
       method: none
+      user: airflow
       host: trino
       port: 8080
       database: hive
