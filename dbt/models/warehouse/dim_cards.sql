@@ -1,7 +1,7 @@
 -- dim_cards.sql — SCD Type 1 (overwrite khi có thay đổi)
 -- Cards ít thay đổi hơn users, overwrite là đủ
 
-{{ config(materialized='incremental', unique_key='card_id') }}
+{{ config(materialized='incremental', unique_key='card_id', incremental_strategy='append') }}
 
 SELECT
     card_id,

@@ -14,7 +14,7 @@
 {{ config(
     materialized='incremental',
     unique_key='transaction_id',
-    incremental_strategy='merge',
+    incremental_strategy='append',
     on_schema_change='sync_all_columns'
 ) }}
 
