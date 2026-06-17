@@ -7,14 +7,18 @@ profile: momo_fraud
 model-paths: ["models"]
 test-paths:  ["tests"]
 
+dispatch:
+  - macro_namespace: dbt
+    search_order: ['momo_fraud', 'dbt']
+
 models:
   momo_fraud:
     staging:
       +materialized: view
-      +schema: staging      # → hive.staging.*
+      +schema: staging
     warehouse:
       +materialized: incremental
-      +schema: warehouse    # → hive.warehouse.*
+      +schema: warehouse
     marts:
       +materialized: table
-      +schema: warehouse    # → hive.warehouse.*
+      +schema: warehouse
