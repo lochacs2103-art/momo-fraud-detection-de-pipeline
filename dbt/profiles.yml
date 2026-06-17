@@ -7,8 +7,8 @@ momo_fraud:
       user: airflow
       host: trino
       port: 8080
-      database: hive        # Trino catalog name
-      schema: staging       # default schema
+      database: hive
+      schema: warehouse    # dbt sẽ write vào hive.warehouse.*
       threads: 4
 
     prod:
@@ -18,5 +18,5 @@ momo_fraud:
       host: trino
       port: 8080
       database: hive
-      schema: staging
+      schema: warehouse
       threads: 8

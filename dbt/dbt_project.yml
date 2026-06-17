@@ -10,11 +10,11 @@ test-paths:  ["tests"]
 models:
   momo_fraud:
     staging:
-      +materialized: view          # staging = views, chạy nhanh
-      +schema: staging
+      +materialized: view
+      +schema: staging      # → hive.staging.*
     warehouse:
-      +materialized: incremental   # warehouse = incremental tables
-      +schema: warehouse
+      +materialized: incremental
+      +schema: warehouse    # → hive.warehouse.*
     marts:
-      +materialized: table         # marts = full tables, rebuild daily
-      +schema: warehouse
+      +materialized: table
+      +schema: warehouse    # → hive.warehouse.*
