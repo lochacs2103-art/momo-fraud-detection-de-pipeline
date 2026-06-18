@@ -2,22 +2,22 @@
 
 SELECT
     user_id,
-    current_age,
+    current_age,                                      -- INT
     age_group,
-    retirement_age,
-    birth_year,
-    birth_month,
+    retirement_age,                                   -- INT
+    CAST(birth_year AS INTEGER)       AS birth_year,  -- STRING in Parquet
+    CAST(birth_month AS INTEGER)      AS birth_month, -- STRING in Parquet
     gender,
     address,
-    latitude,
-    longitude,
-    per_capita_income,
-    yearly_income,
-    total_debt,
-    credit_score,
+    CAST(latitude AS DOUBLE)          AS latitude,    -- STRING in Parquet
+    CAST(longitude AS DOUBLE)         AS longitude,   -- STRING in Parquet
+    per_capita_income,                                -- DOUBLE
+    yearly_income,                                    -- DOUBLE
+    total_debt,                                       -- DOUBLE
+    credit_score,                                     -- INT
     credit_score_band,
     is_invalid_credit_score,
-    num_credit_cards,
+    CAST(num_credit_cards AS INTEGER) AS num_credit_cards, -- STRING in Parquet
     _ingested_at,
     _batch_id,
     created_year,

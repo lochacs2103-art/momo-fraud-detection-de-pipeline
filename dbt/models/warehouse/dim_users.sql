@@ -1,4 +1,4 @@
--- dim_users.sql — đọc từ stg_users, schema đã đúng type từ staging
+-- dim_users.sql — đọc từ stg_users với đúng types
 
 {{ config(
     materialized='incremental',
@@ -14,8 +14,8 @@ SELECT
     retirement_age,
     gender,
     address,
-    CAST(latitude AS DOUBLE)                 AS latitude,
-    CAST(longitude AS DOUBLE)                AS longitude,
+    latitude,
+    longitude,
     per_capita_income,
     yearly_income,
     total_debt,
