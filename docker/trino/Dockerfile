@@ -2,6 +2,7 @@ FROM trinodb/trino:435
 
 # Copy configs vào image — tránh WSL2 bind mount issues
 COPY config.properties /etc/trino/config.properties
+COPY jvm.config /etc/trino/jvm.config
 COPY catalog/hive.properties /etc/trino/catalog/hive.properties
 
 # Copy HDFS configs
