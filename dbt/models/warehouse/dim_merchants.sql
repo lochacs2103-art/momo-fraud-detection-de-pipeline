@@ -1,7 +1,8 @@
--- dim_merchants.sql — derived từ transactions + mcc_codes
--- Rebuild mỗi ngày (table materialization)
+-- dim_merchants.sql — materialized as VIEW
+-- Trino write 74K rows vào HDFS gây NameNode error
+-- View đủ dùng cho Superset dashboards
 
-{{ config(materialized='table') }}
+{{ config(materialized='view') }}
 
 WITH merchant_agg AS (
     SELECT
@@ -17,9 +18,7 @@ WITH merchant_agg AS (
             / NULLIF(COUNT(*), 0),
             4
         )                                                              AS fraud_rate,
-        AVG(CAST(amount AS DOUBLE))                                    AS avg_amount,
-        -- localtimestamp trả về timestamp không có timezone — Hive/Parquet compatible
-        localtimestamp                                                 AS _updated_at
+        AVG(CAST(amount AS DOUBLE))                                    AS avg_amount
     FROM {{ ref('stg_transactions') }}
     WHERE merchant_id IS NOT NULL
     GROUP BY merchant_id
@@ -35,7 +34,6 @@ SELECT
     fraud_txn_count,
     fraud_rate,
     avg_amount,
-    _updated_at,
     CASE
         WHEN fraud_rate >= 0.10 THEN 'CRITICAL'
         WHEN fraud_rate >= 0.05 THEN 'HIGH'
