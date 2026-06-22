@@ -23,11 +23,11 @@ SELECT
     u.yearly_income,
 
     -- Fraud features
-    f.txn_count_last_1h,
-    f.txn_count_last_24h,
-    f.txn_count_last_7d,
-    f.amount_sum_last_24h,
-    f.amount_vs_user_avg_ratio,
+    CAST(f.txn_count_last_1h AS INTEGER)         AS txn_count_last_1h,
+    CAST(f.txn_count_last_24h AS INTEGER)        AS txn_count_last_24h,
+    CAST(f.txn_count_last_7d AS INTEGER)         AS txn_count_last_7d,
+    CAST(f.amount_sum_last_24h AS DOUBLE)        AS amount_sum_last_24h,
+    CAST(f.amount_vs_user_avg_ratio AS DOUBLE)   AS amount_vs_user_avg_ratio,
     f.is_night_txn,
     f.is_weekend,
     f.is_foreign_merchant,
