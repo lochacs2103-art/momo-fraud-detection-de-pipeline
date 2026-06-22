@@ -1,5 +1,9 @@
 -- fraud_features.sql — mart table kết hợp fact + features + dims
 -- Dùng cho Superset dashboards và ML team
+--
+-- Parquet từ Spark lưu amount dạng DECIMAL; Trino ROUND() trả DECIMAL.
+-- CAST tất cả cột số thực sang DOUBLE để tránh lỗi NOT_SUPPORTED khi ghi Parquet.
+-- Nếu đổi schema: drop table cũ rồi chạy --full-refresh (xem hướng dẫn bên dưới).
 
 {{ config(materialized='table') }}
 
@@ -7,7 +11,7 @@ SELECT
     t.transaction_id,
     t.transaction_date,
     t.user_id,
-    t.amount,
+    CAST(t.amount AS DOUBLE)                     AS amount,
     t.amount_currency,
     t.mcc_description,
     t.card_brand,
@@ -20,9 +24,9 @@ SELECT
     u.current_age,
     u.gender,
     u.credit_score,
-    u.yearly_income,
+    CAST(u.yearly_income AS DOUBLE)              AS yearly_income,
 
-    -- Fraud features
+    -- Fraud features (feat_fraud_features Parquet có thể là DECIMAL dù Hive DDL là DOUBLE)
     CAST(f.txn_count_last_1h AS INTEGER)         AS txn_count_last_1h,
     CAST(f.txn_count_last_24h AS INTEGER)        AS txn_count_last_24h,
     CAST(f.txn_count_last_7d AS INTEGER)         AS txn_count_last_7d,
@@ -32,11 +36,11 @@ SELECT
     f.is_weekend,
     f.is_foreign_merchant,
     f.card_on_dark_web,
-    f.risk_score,
+    CAST(f.risk_score AS DOUBLE)                 AS risk_score,
 
-    -- Merchant risk
-    m.fraud_rate          AS merchant_fraud_rate,
-    m.risk_tier           AS merchant_risk_tier,
+    -- Merchant risk (ROUND trong dim_merchants trả DECIMAL)
+    CAST(m.fraud_rate AS DOUBLE)                 AS merchant_fraud_rate,
+    m.risk_tier                                  AS merchant_risk_tier,
 
     t.year,
     t.month,

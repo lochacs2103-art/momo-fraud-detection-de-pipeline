@@ -98,8 +98,9 @@ def build_fraud_features(spark: SparkSession, execution_date: date) -> dict:
     ).select(
         "transaction_id", "user_id",
         "txn_count_last_1h", "txn_count_last_24h", "txn_count_last_7d",
-        "amount_sum_last_1h", "amount_sum_last_24h",
-        "amount_vs_user_avg_ratio",
+        F.col("amount_sum_last_1h").cast("double").alias("amount_sum_last_1h"),
+        F.col("amount_sum_last_24h").cast("double").alias("amount_sum_last_24h"),
+        F.col("amount_vs_user_avg_ratio").cast("double").alias("amount_vs_user_avg_ratio"),
         "is_night_txn", "is_weekend", "is_foreign_merchant",
         "card_on_dark_web",
         "is_fraud",
@@ -185,8 +186,9 @@ def build_fraud_features_full(spark: SparkSession) -> dict:
     df_features = df.select(
         "transaction_id", "user_id",
         "txn_count_last_1h", "txn_count_last_24h", "txn_count_last_7d",
-        "amount_sum_last_1h", "amount_sum_last_24h",
-        "amount_vs_user_avg_ratio",
+        F.col("amount_sum_last_1h").cast("double").alias("amount_sum_last_1h"),
+        F.col("amount_sum_last_24h").cast("double").alias("amount_sum_last_24h"),
+        F.col("amount_vs_user_avg_ratio").cast("double").alias("amount_vs_user_avg_ratio"),
         "is_night_txn", "is_weekend", "is_foreign_merchant",
         card_on_dark_web_col.alias("card_on_dark_web"),
         F.lit(None).cast("boolean").alias("is_fraud"),   # populated in warehouse/dbt

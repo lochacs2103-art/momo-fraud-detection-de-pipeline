@@ -214,9 +214,10 @@ CREATE EXTERNAL TABLE IF NOT EXISTS warehouse.feat_fraud_features (
     txn_count_last_1h           INT,
     txn_count_last_24h          INT,
     txn_count_last_7d           INT,
-    amount_sum_last_1h          DOUBLE,
-    amount_sum_last_24h         DOUBLE,
-    amount_vs_user_avg_ratio    DOUBLE,
+    -- Spark SUM(amount) ghi Parquet DECIMAL; risk_score ghi DOUBLE
+    amount_sum_last_1h          DECIMAL(28,2),
+    amount_sum_last_24h         DECIMAL(28,2),
+    amount_vs_user_avg_ratio    DECIMAL(28,2),
     is_night_txn                BOOLEAN,
     is_weekend                  BOOLEAN,
     is_foreign_merchant         BOOLEAN,
