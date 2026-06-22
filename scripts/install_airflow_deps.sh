@@ -9,7 +9,7 @@ if ! docker ps --format '{{.Names}}' | grep -q '^airflow-webserver$'; then
 fi
 
 echo "Installing Airflow Python deps (dbt-trino, spark provider)..."
-docker exec airflow-webserver pip install -q \
+docker exec -u airflow airflow-webserver python -m pip install -q \
   -r /opt/project/docker/airflow/requirements.txt
 
 echo "Verifying dbt..."
