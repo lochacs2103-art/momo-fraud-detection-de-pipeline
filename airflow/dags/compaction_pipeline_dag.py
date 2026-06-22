@@ -11,7 +11,7 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.utils.task_group import TaskGroup
 
-from dags.utils.spark_utils import make_spark_submit
+from dags.utils.spark_utils import make_spark_submit, PROJECT_ROOT
 
 default_args = {
     "owner":        "de_team",
@@ -34,18 +34,18 @@ with DAG(
 
         compact_transactions = make_spark_submit(
             task_id="compact_transactions_yesterday",
-            application="/opt/airflow/dags/../transformation/compaction/compactor.py",
+            application=f"{PROJECT_ROOT}/transformation/compaction/compactor.py",
             extra_conf={"spark.app.name": "compact_transactions_{{ ds }}"},
         )
 
         compact_users = make_spark_submit(
             task_id="compact_users_yesterday",
-            application="/opt/airflow/dags/../transformation/compaction/compactor.py",
+            application=f"{PROJECT_ROOT}/transformation/compaction/compactor.py",
         )
 
         compact_cards = make_spark_submit(
             task_id="compact_cards_yesterday",
-            application="/opt/airflow/dags/../transformation/compaction/compactor.py",
+            application=f"{PROJECT_ROOT}/transformation/compaction/compactor.py",
         )
         # Chạy song song — không phụ thuộc nhau
 
@@ -63,19 +63,19 @@ with DAG(
 
         tier_transactions = make_spark_submit(
             task_id="tier_transactions_to_warm",
-            application="/opt/airflow/dags/../transformation/compaction/compactor.py",
+            application=f"{PROJECT_ROOT}/transformation/compaction/compactor.py",
         )
 
         tier_users = make_spark_submit(
             task_id="tier_users_to_warm",
-            application="/opt/airflow/dags/../transformation/compaction/compactor.py",
+            application=f"{PROJECT_ROOT}/transformation/compaction/compactor.py",
         )
 
     # ── Vacuum quarantine (xóa records resolved > 30 ngày) ─────────────
     vacuum_quarantine = BashOperator(
         task_id="vacuum_quarantine",
         bash_command=(
-            "python /opt/airflow/dags/../quality/checks/vacuum_quarantine.py "
+            "python /opt/project/quality/checks/vacuum_quarantine.py "
             "--retention-days 30"
         ),
     )

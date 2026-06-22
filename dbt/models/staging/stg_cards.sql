@@ -12,6 +12,7 @@ SELECT
     num_cards_issued,
     credit_limit,
     acct_open_date,
+    account_age_months,
     year_pin_last_changed,
     card_on_dark_web,
     _ingested_at,

@@ -45,20 +45,30 @@ CSV/JSON → PostgreSQL (source-db)
 ## Quick Start
 
 ```bash
-# 1. Download PostgreSQL JDBC driver
+# 1. Download PostgreSQL JDBC driver + copy raw data
 make download-jars
+make copy-data
 
 # 2. Start toàn bộ stack
 make up
 
-# 3. Setup HDFS + Storage Policies (SSD/HDD)
+# 3. Setup HDFS + Hive schemas
 make hdfs-init
-
-# 4. Tạo Hive external tables
 make hive-init
 
-# 5. Chạy ingestion
-make ingest
+# 4. Chạy full pipeline end-to-end (static dataset backfill)
+make pipeline
+# hoặc: bash scripts/run_e2e.sh
+
+# 5. (Tùy chọn) Kết nối Superset → Trino
+make superset-init
+```
+
+### Sau khi `make up` — Airflow Spark connection (lần đầu)
+
+```bash
+docker exec airflow-webserver airflow connections add spark_default \
+  --conn-type spark --conn-host spark-master --conn-port 7077
 ```
 
 ## Services sau khi chạy `make up`

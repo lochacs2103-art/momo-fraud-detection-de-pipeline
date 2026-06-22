@@ -7,15 +7,21 @@ version: "3.8"
 # ============================================================
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.8.1-python3.10
+  build:
+    context: ..
+    dockerfile: docker/airflow/Dockerfile
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow
     AIRFLOW__CORE__FERNET_KEY: "46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLt0nFmkQ="
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+    PYTHONPATH: /opt/project
   volumes:
     - airflow_logs:/opt/airflow/logs
+    - ../dbt:/home/airflow/dbt
+    - ../:/opt/project:ro
+    - ../airflow/dags:/opt/airflow/dags
   depends_on:
     airflow-postgres:
       condition: service_healthy
@@ -167,6 +173,7 @@ services:
     user: root
     environment:
       SPARK_NO_DAEMONIZE: "true"
+      PROJECT_ROOT: /opt/spark/work-dir
     command: >
       bash -c "
         /opt/spark/sbin/start-master.sh --host spark-master --port 7077 --webui-port 8080 &&
@@ -176,6 +183,7 @@ services:
       - "8081:8080"
       - "7077:7077"
     volumes:
+      - ../:/opt/spark/work-dir:ro
       - ./spark/jars:/opt/spark/extra-jars:ro
     depends_on:
       hive-metastore:
@@ -196,12 +204,14 @@ services:
       SPARK_NO_DAEMONIZE: "true"
       SPARK_WORKER_MEMORY: 4g
       SPARK_WORKER_CORES: "4"
+      PROJECT_ROOT: /opt/spark/work-dir
     command: >
       bash -c "
         /opt/spark/sbin/start-worker.sh spark://spark-master:7077 &&
         tail -f /opt/spark/logs/*.out
       "
     volumes:
+      - ../:/opt/spark/work-dir:ro
       - ./spark/jars:/opt/spark/extra-jars:ro
     depends_on:
       - spark-master

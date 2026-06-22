@@ -1,8 +1,17 @@
 # Makefile — shortcut commands cho toàn bộ project
 # Chạy: make <target>
-# Ví dụ: make up, make ingest, make transform
+# Ví dụ: make up, make pipeline
 
-.PHONY: help up down ps logs ingest transform transform-warehouse compact dbt-run dbt-test pipeline test clean
+.PHONY: help up down ps logs ingest transform transform-full transform-warehouse \
+        compact hive-init hive-repair dbt-run dbt-test pipeline superset-init \
+        airflow-init test clean
+
+SPARK_MASTER  := spark://spark-master:7077
+SPARK_JAR     := /opt/spark/extra-jars/postgresql-42.7.1.jar
+WORK_DIR      := /opt/spark/work-dir
+SPARK_SUBMIT  := docker exec spark-master spark-submit --master $(SPARK_MASTER) --jars $(SPARK_JAR)
+DBT           := docker exec airflow-webserver /home/airflow/.local/bin/dbt
+DBT_DIR       := --profiles-dir /home/airflow/dbt --project-dir /home/airflow/dbt --target dev
 
 # Default target
 help:
@@ -10,30 +19,26 @@ help:
 	@echo ""
 	@echo "Setup (chạy lần đầu theo thứ tự):"
 	@echo "  make download-jars  — Download PostgreSQL JDBC driver"
+	@echo "  make copy-data      — Copy CSV/JSON vào source-db init"
 	@echo "  make up             — Start toàn bộ Docker stack"
-	@echo "  make hdfs-init      — Tạo HDFS dirs + set Storage Policies (SSD/HDD)"
+	@echo "  make hdfs-init      — Tạo HDFS dirs + Storage Policies"
+	@echo "  make hive-init      — Tạo Hive external tables"
+	@echo ""
+	@echo "Pipeline end-to-end:"
+	@echo "  make pipeline       — Full backfill: ingest → transform → warehouse → dbt"
+	@echo "  bash scripts/run_e2e.sh  — Same as pipeline (with smoke test)"
+	@echo ""
+	@echo "Pipeline steps:"
+	@echo "  make ingest             — JDBC: source DB → HDFS raw"
+	@echo "  make transform-full     — Full backfill: raw → staging (static dataset)"
+	@echo "  make transform-warehouse — Spark: fraud features"
+	@echo "  make hive-repair        — MSCK REPAIR staging/warehouse partitions"
+	@echo "  make dbt-run            — dbt: staging → warehouse → marts"
+	@echo "  make dbt-test           — dbt data tests"
+	@echo "  make superset-init      — Register Trino connection in Superset"
 	@echo ""
 	@echo "Infrastructure:"
-	@echo "  make up             — Start toàn bộ Docker stack"
-	@echo "  make down           — Stop và remove containers"
-	@echo "  make ps             — Xem trạng thái containers"
-	@echo "  make logs           — Xem logs tất cả services"
-	@echo "  make hdfs-ls        — List files trên HDFS"
-	@echo "  make hdfs-policies  — Xem storage policies hiện tại"
-	@echo ""
-	@echo "Pipeline:"
-	@echo "  make ingest             — Ingest: source DB → HDFS raw (JDBC parallel)"
-	@echo "  make transform          — Transform: raw → staging (clean + enrich)"
-	@echo "  make transform-warehouse — Build warehouse: dims (SCD1/2) + fraud features"
-	@echo "  make compact            — Compaction: merge small files, sort by user_id"
-	@echo "  make dbt-run            — Run dbt models (staging → warehouse → marts)"
-	@echo "  make dbt-test           — Run dbt tests"
-	@echo "  make pipeline           — Run full pipeline end-to-end"
-	@echo ""
-	@echo "Development:"
-	@echo "  make test      — Chạy unit tests"
-	@echo "  make lint      — Chạy linter"
-	@echo "  make clean     — Xóa temp files"
+	@echo "  make up / down / ps / logs / hdfs-ls"
 
 # ---- Infrastructure ----
 
@@ -93,14 +98,13 @@ logs:
 logs-%:
 	docker compose -f docker/docker-compose.yml logs -f $*
 
-# ---- HDFS Setup (chạy lần đầu sau khi up) ----
+# ---- HDFS / Hive ----
 
 hdfs-init:
 	@echo "Setting up HDFS directories and storage policies..."
 	bash docker/hadoop/setup_storage_policies.sh
 
 hdfs-policies:
-	@echo "Current storage policies:"
 	docker exec namenode hdfs storagepolicies -getStoragePolicy -path /data/lake/raw
 	docker exec namenode hdfs storagepolicies -getStoragePolicy -path /data/lake/staging
 	docker exec namenode hdfs storagepolicies -getStoragePolicy -path /data/lake/warm
@@ -111,85 +115,66 @@ hdfs-ls:
 
 hive-init:
 	@echo "Creating Hive databases and external tables..."
-	docker exec hive-server beeline -u jdbc:hive2://localhost:10000 \
-		-f /opt/hive/conf/../../../docker/hive/init_hive_schemas.sql
+	cat docker/hive/init_hive_schemas.sql | docker exec -i hive-server \
+		beeline -u jdbc:hive2://localhost:10000 --silent=true
 	@echo "Hive schemas created."
+
+hive-repair:
+	@echo "Syncing Hive partitions..."
+	docker exec hive-server beeline -u jdbc:hive2://localhost:10000 --silent=true -e "\
+		MSCK REPAIR TABLE staging.transactions; \
+		MSCK REPAIR TABLE staging.users; \
+		MSCK REPAIR TABLE staging.cards; \
+		MSCK REPAIR TABLE warehouse.feat_fraud_features; \
+	"
 
 # ---- Pipeline ----
 
 ingest:
-	@echo "Running JDBC ingestion jobs (source DB → HDFS raw)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		--jars /opt/spark/extra-jars/postgresql-42.7.1.jar \
-		/opt/spark/work-dir/ingestion/jdbc_ingester.py
+	@echo "Running JDBC ingestion (source DB → HDFS raw)..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/ingestion/jdbc_ingester.py
 
-transform:
-	@echo "Running transformation jobs (raw → staging)..."
-	@echo "Step 1: Clean transactions..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		--jars /opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar \
-		/opt/bitnami/spark/work-dir/transformation/staging/clean_transactions.py
-	@echo "Step 2: Clean users..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/staging/clean_users.py
-	@echo "Step 3: Clean cards..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/staging/clean_cards.py
-	@echo "Step 4: Enrich transactions (broadcast join mcc/cards/fraud)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/staging/enrich_transactions.py
-	@echo "Transformation complete."
+transform-full:
+	@echo "Full backfill: raw → staging..."
+	@echo "Step 1/4: clean_transactions_full..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/staging/clean_transactions_full.py
+	@echo "Step 2/4: clean_users..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/staging/clean_users.py
+	@echo "Step 3/4: clean_cards..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/staging/clean_cards.py
+	@echo "Step 4/4: enrich_transactions_full..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/staging/enrich_transactions_full.py
+	@echo "Transform complete."
 
 transform-warehouse:
-	@echo "Running warehouse build jobs..."
-	@echo "Step 1: Build dim_users (SCD Type 2)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/warehouse/build_dim_users.py
-	@echo "Step 2: Build dim_cards (SCD Type 1)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/warehouse/build_dim_cards.py
-	@echo "Step 3: Build fraud features (window functions)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/warehouse/build_fraud_features.py
+	@echo "Building warehouse features (Spark)..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/warehouse/build_fraud_features.py
 	@echo "Warehouse build complete."
 
 compact:
-	@echo "Running compaction job (merge small files, sort by user_id)..."
-	docker exec spark-master spark-submit \
-		--master spark://spark-master:7077 \
-		/opt/bitnami/spark/work-dir/transformation/compaction/compactor.py
-	@echo "Compaction complete."
+	@echo "Running compaction..."
+	$(SPARK_SUBMIT) $(WORK_DIR)/transformation/compaction/compactor.py
 
 dbt-run:
-	@echo "Running dbt models (staging → warehouse → marts)..."
-	docker exec trino dbt run \
-		--profiles-dir /opt/dbt \
-		--project-dir /opt/dbt \
-		--target prod
+	@echo "Running dbt models..."
+	$(DBT) run $(DBT_DIR) --vars '{"execution_date": "2019-12-31"}'
 
 dbt-test:
 	@echo "Running dbt tests..."
-	docker exec trino dbt test \
-		--profiles-dir /opt/dbt \
-		--project-dir /opt/dbt \
-		--target prod
+	$(DBT) test $(DBT_DIR)
 
-pipeline:
-	@echo "Running full pipeline: ingest → transform → warehouse → dbt..."
-	make ingest
-	make transform
-	make transform-warehouse
-	make dbt-run
-	make dbt-test
+pipeline: ingest transform-full transform-warehouse hive-repair dbt-run dbt-test
 	@echo "Full pipeline complete."
+
+superset-init:
+	bash scripts/init_superset_trino.sh
+
+airflow-init:
+	@echo "Registering Airflow Spark connection..."
+	docker exec airflow-webserver airflow connections delete spark_default 2>/dev/null || true
+	docker exec airflow-webserver airflow connections add spark_default \
+		--conn-type spark --conn-host spark-master --conn-port 7077
+	@echo "Done."
 
 # ---- Development ----
 

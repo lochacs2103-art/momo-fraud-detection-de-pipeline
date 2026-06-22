@@ -4,24 +4,22 @@ fraud_pipeline_dag.py — Main daily pipeline DAG.
 Schedule: @daily lúc 02:00 AM
 Catchup: True → Airflow tự backfill từng ngày nếu bị miss
 
-Flow:
-  [ingest group] → validate_raw → spark_staging → hive_repair
-                → dbt_warehouse → dbt_test → notify
+Lưu ý: Backfill lần đầu (static dataset) dùng Makefile / scripts/run_e2e.sh.
+DAG này dùng cho daily incremental sau khi data đã có trên HDFS.
 
-Mỗi run chỉ process đúng 1 ngày (execution_date).
-→ Không bao giờ Spark job phải xử lý cả năm cùng lúc.
+Flow:
+  ingest_all → validate_raw → staging → hive_repair
+            → build_features → dbt → dbt_test → notify
 """
 
 from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator, BranchPythonOperator
-from airflow.operators.empty import EmptyOperator
+from airflow.operators.python import BranchPythonOperator
 from airflow.utils.task_group import TaskGroup
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
-from dags.utils.spark_utils import make_spark_submit, JDBC_JAR, SPARK_CONF
+from dags.utils.spark_utils import make_spark_submit, PROJECT_ROOT
 
 default_args = {
     "owner":            "de_team",
@@ -31,119 +29,86 @@ default_args = {
     "email_on_retry":   False,
 }
 
+DBT_CMD = (
+    "/home/airflow/.local/bin/dbt "
+    "--profiles-dir /home/airflow/dbt "
+    "--project-dir /home/airflow/dbt "
+    "--target dev "
+    '--vars \'{"execution_date": "{{ ds }}"}\''
+)
+
 with DAG(
     dag_id="fraud_data_pipeline",
     description="Daily fraud detection data pipeline: ingest → staging → warehouse",
-    schedule_interval="0 2 * * *",   # 02:00 AM every day
+    schedule_interval="0 2 * * *",
     start_date=datetime(2023, 1, 1),
-    catchup=True,                    # backfill từng ngày
-    max_active_runs=4,               # tối đa 4 ngày chạy song song
+    catchup=True,
+    max_active_runs=4,
     default_args=default_args,
     tags=["fraud", "daily", "core"],
 ) as dag:
 
-    # ── Ingestion group ────────────────────────────────────────────────────
-    with TaskGroup("ingest", tooltip="JDBC ingest từ source DB → HDFS raw") as ingest_group:
+    ingest_all = make_spark_submit(
+        task_id="ingest_all",
+        application=f"{PROJECT_ROOT}/ingestion/jdbc_ingester.py",
+        extra_conf={"spark.app.name": "ingest_all_{{ ds }}"},
+    )
 
-        ingest_transactions = make_spark_submit(
-            task_id="ingest_transactions",
-            application="/opt/airflow/dags/../ingestion/jdbc_ingester.py",
-            extra_conf={"spark.app.name": "ingest_transactions_{{ ds }}"},
-        )
-
-        ingest_users = make_spark_submit(
-            task_id="ingest_users",
-            application="/opt/airflow/dags/../ingestion/jdbc_ingester.py",
-        )
-
-        ingest_cards = make_spark_submit(
-            task_id="ingest_cards",
-            application="/opt/airflow/dags/../ingestion/jdbc_ingester.py",
-        )
-
-        ingest_mcc = make_spark_submit(
-            task_id="ingest_mcc",
-            application="/opt/airflow/dags/../ingestion/jdbc_ingester.py",
-        )
-
-        ingest_fraud_labels = make_spark_submit(
-            task_id="ingest_fraud_labels",
-            application="/opt/airflow/dags/../ingestion/jdbc_ingester.py",
-        )
-
-        # ingest_mcc và ingest_fraud_labels chạy song song (không phụ thuộc nhau)
-        # ingest_transactions chạy song song với users/cards
-
-    # ── Validate raw data ─────────────────────────────────────────────────
     validate_raw = BashOperator(
         task_id="validate_raw",
         bash_command=(
-            "python /opt/airflow/dags/../quality/run_checks.py "
+            f"python {PROJECT_ROOT}/quality/checks/run_checks.py "
             "--layer raw --date {{ ds }}"
         ),
     )
 
-    # ── Staging transformation ─────────────────────────────────────────────
     with TaskGroup("staging", tooltip="Clean + Enrich → HDFS staging") as staging_group:
 
         clean_txn = make_spark_submit(
             task_id="clean_transactions",
-            application="/opt/airflow/dags/../transformation/staging/clean_transactions.py",
+            application=f"{PROJECT_ROOT}/transformation/staging/clean_transactions.py",
+            application_args=["{{ ds }}"],
             extra_conf={"spark.app.name": "clean_transactions_{{ ds }}"},
         )
 
         enrich_txn = make_spark_submit(
             task_id="enrich_transactions",
-            application="/opt/airflow/dags/../transformation/staging/enrich_transactions.py",
+            application=f"{PROJECT_ROOT}/transformation/staging/enrich_transactions.py",
+            application_args=["{{ ds }}"],
         )
 
         clean_txn >> enrich_txn
 
-    # ── MSCK REPAIR — sync partitions vào Hive Metastore ─────────────────
-    # Quan trọng: sau khi Spark write, Hive Metastore chưa biết partitions mới
-    # Nếu không repair → Trino query sẽ không thấy data mới
-    # MSCK REPAIR nhanh hơn nhiều so với Spark list HDFS folders
     hive_repair = BashOperator(
         task_id="hive_msck_repair",
         bash_command="""
-            beeline -u jdbc:hive2://hive-server:10000 -e "
-                MSCK REPAIR TABLE raw.transactions;
+            beeline -u jdbc:hive2://hive-server:10000 --silent=true -e "
                 MSCK REPAIR TABLE staging.transactions;
                 MSCK REPAIR TABLE staging.users;
                 MSCK REPAIR TABLE staging.cards;
+                MSCK REPAIR TABLE warehouse.feat_fraud_features;
             "
         """,
     )
 
-    # ── Build fraud features (Spark) ──────────────────────────────────────
     build_features = make_spark_submit(
         task_id="build_fraud_features",
-        application="/opt/airflow/dags/../transformation/warehouse/build_fraud_features.py",
+        application=f"{PROJECT_ROOT}/transformation/warehouse/build_fraud_features.py",
+        application_args=["{{ ds }}"],
     )
 
-    # ── dbt warehouse models ──────────────────────────────────────────────
     dbt_run = BashOperator(
-        task_id="dbt_run_warehouse",
-        bash_command=(
-            "cd /opt/airflow/dags/../dbt && "
-            "dbt run --profiles-dir . --target prod "
-            "--vars '{\"execution_date\": \"{{ ds }}\"}'"
-        ),
+        task_id="dbt_run",
+        bash_command=f"{DBT_CMD} run --log-path /home/airflow/dbt/logs",
     )
 
     dbt_test = BashOperator(
         task_id="dbt_test",
-        bash_command=(
-            "cd /opt/airflow/dags/../dbt && "
-            "dbt test --profiles-dir . --target prod"
-        ),
+        bash_command=f"{DBT_CMD} test --log-path /home/airflow/dbt/logs",
     )
 
-    # ── Notify ────────────────────────────────────────────────────────────
     def _check_quarantine(**context):
-        """Branch: nếu có quarantine records → flag team, ngược lại → success."""
-        # TODO: query quarantine table count
-        quarantine_count = 0  # placeholder
+        quarantine_count = 0
         if quarantine_count > 0:
             return "flag_quarantine"
         return "notify_success"
@@ -163,7 +128,6 @@ with DAG(
         bash_command="echo 'Pipeline SUCCESS for {{ ds }}'",
     )
 
-    # ── Task dependencies ─────────────────────────────────────────────────
-    ingest_group >> validate_raw >> staging_group >> hive_repair
+    ingest_all >> validate_raw >> staging_group >> hive_repair
     hive_repair >> build_features >> dbt_run >> dbt_test >> branch
     branch >> [notify_success, flag_quarantine]

@@ -14,7 +14,7 @@ jdbc_url: "jdbc:postgresql://source-db:5432/momo_source"
 driver: "org.postgresql.Driver"
 
 # JDBC jar path trong Spark container
-jdbc_jar: "/opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar"
+jdbc_jar: "/opt/spark/extra-jars/postgresql-42.7.1.jar"
 
 # Tables cần ingest — tên table trong source DB
 tables:

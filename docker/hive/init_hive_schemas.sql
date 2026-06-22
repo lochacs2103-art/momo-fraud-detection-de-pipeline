@@ -40,9 +40,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS staging.transactions (
     has_error                   BOOLEAN,
     is_fraud                BOOLEAN,
     is_valid                BOOLEAN,
-    ingested_at             TIMESTAMP,
-    source_file             STRING,
-    batch_id                STRING
+    _ingested_at            TIMESTAMP,
+    _source_file            STRING,
+    _batch_id               STRING
 )
 PARTITIONED BY (year INT, month INT, day INT)
 STORED AS PARQUET
@@ -68,9 +68,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS staging.users (
     is_invalid_credit_score BOOLEAN,
     num_credit_cards        INT,
     is_valid                BOOLEAN,
-    ingested_at             TIMESTAMP,
-    source_file             STRING,
-    batch_id                STRING
+    _ingested_at            TIMESTAMP,
+    _source_file            STRING,
+    _batch_id               STRING
 )
 PARTITIONED BY (created_year INT, created_month INT)
 STORED AS PARQUET
@@ -93,9 +93,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS staging.cards (
     year_pin_last_changed   INT,
     card_on_dark_web        BOOLEAN,
     is_valid                BOOLEAN,
-    ingested_at             TIMESTAMP,
-    source_file             STRING,
-    batch_id                STRING
+    _ingested_at            TIMESTAMP,
+    _source_file            STRING,
+    _batch_id               STRING
 )
 PARTITIONED BY (card_brand_part STRING, expires_year_part INT)
 STORED AS PARQUET
@@ -106,9 +106,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS staging.mcc_codes (
     mcc             INT,
     mcc_code        STRING,
     mcc_description STRING,
-    ingested_at     TIMESTAMP,
-    source_file     STRING,
-    batch_id        STRING
+    _ingested_at      TIMESTAMP,
+    _source_file      STRING,
+    _batch_id         STRING
 )
 STORED AS PARQUET
 LOCATION 'hdfs://namenode:9000/data/lake/staging/mcc_codes/'
@@ -124,7 +124,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS staging.transactions_quarantine (
     resolved_by         STRING,
     resolved_at         TIMESTAMP,
     is_resolved         BOOLEAN,
-    batch_id            STRING
+    _batch_id           STRING
 )
 PARTITIONED BY (year INT, month INT, day INT)
 STORED AS PARQUET
@@ -156,9 +156,9 @@ CREATE EXTERNAL TABLE IF NOT EXISTS warehouse.fact_transactions (
     error_insufficient_balance  BOOLEAN,
     error_technical_glitch      BOOLEAN,
     has_error                   BOOLEAN,
-    is_fraud                BOOLEAN,
-    is_valid                BOOLEAN,
-    batch_id                STRING
+    is_fraud                    BOOLEAN,
+    is_valid                    BOOLEAN,
+    _batch_id                   STRING
 )
 PARTITIONED BY (year INT, month INT)
 STORED AS PARQUET
@@ -184,7 +184,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS warehouse.dim_users (
     valid_from              TIMESTAMP,
     valid_to                TIMESTAMP,
     is_current              BOOLEAN,
-    batch_id                STRING
+    _batch_id               STRING
 )
 STORED AS PARQUET
 LOCATION 'hdfs://namenode:9000/data/lake/warehouse/dim_users/'
@@ -202,7 +202,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS warehouse.dim_cards (
     credit_limit            DOUBLE,
     account_age_months      INT,
     card_on_dark_web        BOOLEAN,
-    batch_id                STRING
+    _batch_id               STRING
 )
 STORED AS PARQUET
 LOCATION 'hdfs://namenode:9000/data/lake/warehouse/dim_cards/'
@@ -224,7 +224,7 @@ CREATE EXTERNAL TABLE IF NOT EXISTS warehouse.feat_fraud_features (
     card_on_dark_web            BOOLEAN,
     is_fraud                    BOOLEAN,
     risk_score                  DOUBLE,
-    batch_id                    STRING
+    _batch_id                   STRING
 )
 PARTITIONED BY (year INT, month INT, day INT)
 STORED AS PARQUET

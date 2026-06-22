@@ -3,7 +3,9 @@
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
 SPARK_CONN_ID = "spark_default"
-JDBC_JAR      = "/opt/bitnami/spark/extra-jars/postgresql-42.7.1.jar"
+JDBC_JAR      = "/opt/spark/extra-jars/postgresql-42.7.1.jar"
+SPARK_MASTER  = "spark://spark-master:7077"
+PROJECT_ROOT  = "/opt/project"
 
 SPARK_CONF = {
     "spark.sql.adaptive.enabled":               "true",
@@ -18,13 +20,20 @@ SPARK_CONF = {
 }
 
 
-def make_spark_submit(task_id: str, application: str, extra_conf: dict = None) -> SparkSubmitOperator:
+def make_spark_submit(
+    task_id: str,
+    application: str,
+    extra_conf: dict = None,
+    application_args: list = None,
+) -> SparkSubmitOperator:
     conf = {**SPARK_CONF, **(extra_conf or {})}
     return SparkSubmitOperator(
         task_id=task_id,
         conn_id=SPARK_CONN_ID,
         application=application,
+        application_args=application_args or [],
         jars=JDBC_JAR,
         conf=conf,
         verbose=False,
+        env_vars={"PROJECT_ROOT": PROJECT_ROOT},
     )

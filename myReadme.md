@@ -81,9 +81,15 @@
 - [x] Implement clean_transactions.py với tất cả changes trên
 - [x] Tạo clean_users.py
 - [x] Tạo clean_cards.py
-- [ ] Update staging Hive DDL với các columns mới (errors exploded, age_group, credit_score_band, account_age_months, is_online_transaction, is_refund, use_chip enum)
-- [ ] Update dbt staging models với columns mới
-- [ ] Update unit tests
+- [x] Update staging Hive DDL với các columns mới (errors exploded, age_group, credit_score_band, account_age_months, is_online_transaction, is_refund, use_chip enum)
+- [x] Update dbt staging models với columns mới
+- [ ] Update unit tests (amount_parser đã có; thêm tests cho clean logic nếu cần)
+
+## E2E Pipeline (Session 4)
+
+- `make pipeline` / `scripts/run_e2e.sh` — full backfill cho static dataset
+- Docker mount code vào Spark + Airflow, dbt chạy từ airflow-webserver
+- Marts: `fraud_features`, `user_daily_stats`, `merchant_risk_score` ✓
 
 ---
 
