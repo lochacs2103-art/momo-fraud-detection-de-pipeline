@@ -7,9 +7,10 @@ version: "3.8"
 # ============================================================
 
 x-airflow-common: &airflow-common
-  build:
-    context: ..
-    dockerfile: docker/airflow/Dockerfile
+  # Dùng image gốc — KHÔNG build mỗi lần up (tránh pip install 20–30 phút).
+  # Cài dbt 1 lần: make airflow-install-dbt
+  # Hoặc build custom image (tùy chọn): docker compose --profile airflow-custom build
+  image: apache/airflow:2.8.1-python3.10
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-postgres/airflow

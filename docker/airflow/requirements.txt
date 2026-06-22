@@ -1,6 +1,3 @@
-apache-airflow==2.8.1
+# Pin versions — tránh pip resolve chậm. Chỉ cài 2 package chính.
+dbt-trino==1.8.5
 apache-airflow-providers-apache-spark==4.7.1
-apache-airflow-providers-postgres==5.10.2
-pyspark==3.5.0
-structlog==23.2.0
-pyyaml==6.0.1

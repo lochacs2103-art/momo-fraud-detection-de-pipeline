@@ -4,7 +4,7 @@
 
 .PHONY: help up down ps logs ingest transform transform-full transform-warehouse \
         compact hive-init hive-repair dbt-run dbt-test pipeline superset-init \
-        airflow-init test clean
+        airflow-init airflow-install-dbt test clean
 
 SPARK_MASTER  := spark://spark-master:7077
 SPARK_JAR     := /opt/spark/extra-jars/postgresql-42.7.1.jar
@@ -175,6 +175,9 @@ airflow-init:
 	docker exec airflow-webserver airflow connections add spark_default \
 		--conn-type spark --conn-host spark-master --conn-port 7077
 	@echo "Done."
+
+airflow-install-dbt:
+	bash scripts/install_airflow_deps.sh
 
 # ---- Development ----
 

@@ -49,8 +49,11 @@ CSV/JSON → PostgreSQL (source-db)
 make download-jars
 make copy-data
 
-# 2. Start toàn bộ stack
+# 2. Start toàn bộ stack (KHÔNG dùng --build trừ lần đầu / khi đổi Spark/Hive image)
 make up
+
+# 2b. Cài dbt vào Airflow (1 lần, ~2–5 phút — bỏ qua nếu đã cài)
+make airflow-install-dbt
 
 # 3. Setup HDFS + Hive schemas
 make hdfs-init
