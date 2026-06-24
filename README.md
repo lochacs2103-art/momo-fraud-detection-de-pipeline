@@ -21,22 +21,22 @@ Enterprise-grade batch data pipeline cho bài toán fraud detection tại fintec
 ```mermaid
 flowchart TD
     subgraph Sources ["Data Sources"]
-        Files[CSV / JSON] --> DB[(PostgreSQL)]
+        Files["CSV / JSON"] --> DB[("PostgreSQL")]
     end
 
     subgraph DataLake ["HDFS Data Lake (Hot - SSD)"]
-        Raw[Raw Layer]
-        Staging[Staging Layer]
-        Warehouse[Warehouse Layer]
+        Raw["Raw Layer"]
+        Staging["Staging Layer"]
+        Warehouse["Warehouse Layer"]
     end
 
     subgraph Tiering ["Tiered Storage (Warm/Cold - HDD)"]
-        Archive[Warm: 8-90d / Cold: 91d+]
+        Archive["Warm: 8-90d / Cold: 91d+"]
     end
 
     subgraph BI ["Serving & Visualization"]
-        Trino{Trino}
-        Superset[Superset Dashboards]
+        Trino{"Trino"}
+        Superset["Superset Dashboards"]
     end
 
     DB -- "Spark JDBC Parallel Read" --> Raw
