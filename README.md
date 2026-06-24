@@ -95,7 +95,6 @@ docker exec airflow-webserver airflow connections add spark_default \
 | `transformation/` | Spark jobs xử lý dữ liệu staging, data cleaning và compaction |
 | `quality/` | Các script kiểm tra Data Quality (vd: Great Expectations) |
 | `tests/` | Unit test và Integration test cho Spark jobs |
-| `docs/` | Tài liệu dự án và thiết kế kiến trúc |
 | `docker/` | Docker Compose và cấu hình các services (Trino, Hive, Superset...) |
 
 ## Data Quality & Testing
@@ -104,6 +103,4 @@ docker exec airflow-webserver airflow connections add spark_default \
 
 ## Docs
 
-- `docs/pipeline_explained.html` — visual guide, mở bằng browser
-- `docs/spark_memory_guide.md` — Spark memory layout chi tiết
 - `myReadme.md` — engineering decisions log
