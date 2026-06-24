@@ -20,6 +20,7 @@ x-airflow-common: &airflow-common
     PYTHONPATH: /opt/project
   volumes:
     - airflow_logs:/opt/airflow/logs
+    - airflow_pip:/home/airflow/.local
     - ../dbt:/home/airflow/dbt
     - ../:/opt/project:ro
     - ../airflow/dags:/opt/airflow/dags
@@ -345,5 +346,7 @@ volumes:
     name: de_airflow_postgres_data
   airflow_logs:
     name: de_airflow_logs
+  airflow_pip:
+    name: de_airflow_pip
   superset_data:
     name: de_superset_data

@@ -30,7 +30,7 @@ default_args = {
 }
 
 DBT_CMD = (
-    "/home/airflow/.local/bin/dbt "
+    "python -m dbt "
     "--profiles-dir /home/airflow/dbt "
     "--project-dir /home/airflow/dbt "
     "--target dev "
