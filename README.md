@@ -18,18 +18,35 @@ Enterprise-grade batch data pipeline cho bài toán fraud detection tại fintec
 
 ## Architecture
 
-```
-CSV/JSON → PostgreSQL (source-db)
-               ↓ Spark JDBC parallel read
-           HDFS Raw Layer     [SSD - HOT]
-               ↓ Spark cleaning + enrichment
-           HDFS Staging Layer [SSD - HOT]
-               ↓ Spark + dbt
-           HDFS Warehouse     [SSD - HOT]
-               ↓ Tiering jobs
-           Warm (8-90d) / Cold (91d+) [HDD]
-               ↓
-           Trino → Superset Dashboards
+```mermaid
+flowchart TD
+    subgraph Sources ["Data Sources"]
+        Files[CSV / JSON] --> DB[(PostgreSQL)]
+    end
+
+    subgraph DataLake ["HDFS Data Lake (Hot - SSD)"]
+        Raw[Raw Layer]
+        Staging[Staging Layer]
+        Warehouse[Warehouse Layer]
+    end
+
+    subgraph Tiering ["Tiered Storage (Warm/Cold - HDD)"]
+        Archive[Warm: 8-90d / Cold: 91d+]
+    end
+
+    subgraph BI ["Serving & Visualization"]
+        Trino{Trino}
+        Superset[Superset Dashboards]
+    end
+
+    DB -- "Spark JDBC Parallel Read" --> Raw
+    Raw -- "Spark Cleaning + Enrichment" --> Staging
+    Staging -- "dbt Models (dbt-trino)" --> Warehouse
+    Warehouse -- "Spark Tiering Jobs" --> Archive
+    
+    Warehouse -. "Query" .-> Trino
+    Archive -. "Query" .-> Trino
+    Trino -- "Connect via SQLAlchemy" --> Superset
 ```
 
 ## Key Features
