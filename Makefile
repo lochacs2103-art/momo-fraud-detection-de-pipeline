@@ -10,7 +10,7 @@ SPARK_MASTER  := spark://spark-master:7077
 SPARK_JAR     := /opt/spark/extra-jars/postgresql-42.7.1.jar
 WORK_DIR      := /opt/spark/work-dir
 SPARK_SUBMIT  := docker exec spark-master spark-submit --master $(SPARK_MASTER) --jars $(SPARK_JAR)
-DBT           := docker exec -u airflow airflow-webserver python -m dbt
+DBT           := docker exec -u airflow airflow-webserver /home/airflow/.local/bin/dbt
 DBT_DIR       := --profiles-dir /home/airflow/dbt --project-dir /home/airflow/dbt --target dev
 
 # Default target

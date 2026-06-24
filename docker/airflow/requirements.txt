@@ -1,3 +1,7 @@
-# Pin versions — tránh pip resolve chậm. Chỉ cài 2 package chính.
+# dbt — dùng cho make dbt-run / Airflow dbt tasks
 dbt-trino==1.8.5
+dbt-core==1.8.9
+
+# Spark provider — KHÔNG kéo pyspark 455MB (Spark chạy trên spark-master container).
+# Cài với --no-deps trong install_airflow_deps.sh
 apache-airflow-providers-apache-spark==4.7.1
