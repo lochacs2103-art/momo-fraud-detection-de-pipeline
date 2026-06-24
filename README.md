@@ -85,9 +85,25 @@ docker exec airflow-webserver airflow connections add spark_default \
 | Superset UI | http://localhost:8088 | admin/admin |
 | Source DB | localhost:5432/momo_source | momo/momo |
 
+## Directory Structure
+
+| Folder | Description |
+|---|---|
+| `airflow/` | Airflow DAGs và cấu hình orchestration |
+| `dbt/` | dbt models cho lớp Data Warehouse (dbt-trino) |
+| `ingestion/` | Spark jobs để extract dữ liệu từ Source (JDBC parallel read) |
+| `transformation/` | Spark jobs xử lý dữ liệu staging, data cleaning và compaction |
+| `quality/` | Các script kiểm tra Data Quality (vd: Great Expectations) |
+| `tests/` | Unit test và Integration test cho Spark jobs |
+| `docs/` | Tài liệu dự án và thiết kế kiến trúc |
+| `docker/` | Docker Compose và cấu hình các services (Trino, Hive, Superset...) |
+
+## Data Quality & Testing
+- **Data Quality (`quality/`)**: Tích hợp các kiểm tra chất lượng dữ liệu để đảm bảo tính toàn vẹn của data trước khi đưa vào Warehouse.
+- **Testing (`tests/`)**: Bao gồm Unit Tests và Integration Tests cho các Spark jobs xử lý dữ liệu.
+
 ## Docs
 
-- `PROJECT_SUMMARY.md` — tổng hợp toàn bộ architecture, design decisions, file structure
 - `docs/pipeline_explained.html` — visual guide, mở bằng browser
 - `docs/spark_memory_guide.md` — Spark memory layout chi tiết
 - `myReadme.md` — engineering decisions log
